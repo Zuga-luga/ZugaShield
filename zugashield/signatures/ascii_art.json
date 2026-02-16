@@ -1,0 +1,259 @@
+{
+  "name": "ASCII Art Bypass Signatures",
+  "description": "Detection patterns for ASCII art-based bypass attacks that encode instructions visually",
+  "category": "ascii_art",
+  "signatures": [
+    {
+      "id": "AA-001",
+      "category": "ascii_art",
+      "name": "Box Drawing Character Block",
+      "description": "Large blocks of box-drawing characters that may encode hidden instructions",
+      "patterns": [
+        "[\\u2500-\\u257F]{20,}",
+        "(?:[\\u2580-\\u259F]\\s*){15,}",
+        "[\\u2550-\\u256C]{10,}"
+      ],
+      "severity": "medium",
+      "confidence": 0.65,
+      "false_positive_rate": 0.10,
+      "references": ["visual-bypass"],
+      "enabled": true
+    },
+    {
+      "id": "AA-002",
+      "category": "ascii_art",
+      "name": "Block Element Instruction Encoding",
+      "description": "Block elements used to visually spell out commands or instructions",
+      "patterns": [
+        "(?:[\\u2580-\\u2590]\\s*){20,}",
+        "(?:[\\u2591-\\u2593]\\s*){20,}",
+        "[\\u2588]{5,}(?:\\s*[\\u2588]{5,}){2,}"
+      ],
+      "severity": "medium",
+      "confidence": 0.60,
+      "false_positive_rate": 0.12,
+      "references": ["visual-bypass"],
+      "enabled": true
+    },
+    {
+      "id": "AA-003",
+      "category": "ascii_art",
+      "name": "Figlet Banner Text with Commands",
+      "description": "Figlet-style ASCII art containing command keywords",
+      "patterns": [
+        "(?:[\\|\\/_\\\\\\-~`'\"\\*\\+=#]\\s*){30,}.*?(?:ignore|execute|bypass|override|system)",
+        "_{3,}.*?\\|.*?\\|.*?(?:ignore|execute|bypass)",
+        "[\\*]{3,}.*?[\\*]{3,}.*?(?:ignore|execute|bypass|override)"
+      ],
+      "severity": "high",
+      "confidence": 0.75,
+      "false_positive_rate": 0.05,
+      "references": ["visual-bypass", "ascii-smuggling"],
+      "enabled": true
+    },
+    {
+      "id": "AA-004",
+      "category": "ascii_art",
+      "name": "Braille Character Abuse",
+      "description": "Braille characters used to encode binary data or hidden instructions",
+      "patterns": [
+        "[\\u2800-\\u28FF]{20,}",
+        "(?:[\\u2801-\\u28FF]\\s*){15,}",
+        "braille.*?(?:decode|instruction|execute|follow)"
+      ],
+      "severity": "high",
+      "confidence": 0.80,
+      "false_positive_rate": 0.03,
+      "references": ["unicode-smuggling", "visual-bypass"],
+      "enabled": true
+    },
+    {
+      "id": "AA-005",
+      "category": "ascii_art",
+      "name": "ASCII Art with Embedded Commands",
+      "description": "Large ASCII art blocks that contain injection keywords when read",
+      "patterns": [
+        "(?:[A-Z@#\\$\\*\\+\\-=_\\|\\\\/<>\\[\\]\\{\\}\\(\\)\\s]){100,}.*?(?:IGNORE|EXECUTE|BYPASS|OVERRIDE|SYSTEM)",
+        "(?:(?:[^\\w\\s]\\s*){5,}(?:\\w+\\s*)){5,}.*?(?:ignore|execute|bypass)"
+      ],
+      "severity": "high",
+      "confidence": 0.70,
+      "false_positive_rate": 0.08,
+      "references": ["visual-bypass"],
+      "enabled": true
+    },
+    {
+      "id": "AA-006",
+      "category": "ascii_art",
+      "name": "Vertical Text Encoding",
+      "description": "Instructions encoded vertically in ASCII art",
+      "patterns": [
+        "(?:^|\\n)\\s*(?:[^\\n]{1,3}\\n){10,}.*?(?:i.*?g.*?n.*?o.*?r.*?e|e.*?x.*?e.*?c.*?u.*?t.*?e)",
+        "(?:^[A-Z]\\s*$\\n?){5,}"
+      ],
+      "severity": "medium",
+      "confidence": 0.65,
+      "false_positive_rate": 0.10,
+      "references": ["visual-bypass"],
+      "enabled": true
+    },
+    {
+      "id": "AA-007",
+      "category": "ascii_art",
+      "name": "High-Entropy ASCII Block",
+      "description": "Abnormally high density of non-alphanumeric ASCII characters suggesting encoding",
+      "patterns": [
+        "(?:[^\\w\\s\\r\\n]){40,}",
+        "(?:[\\!\\@\\#\\$\\%\\^\\&\\*\\(\\)\\-\\+\\=\\[\\]\\{\\}\\|\\\\;:'\"<>,\\.\\?/~`]\\s*){30,}"
+      ],
+      "severity": "medium",
+      "confidence": 0.60,
+      "false_positive_rate": 0.15,
+      "references": ["visual-bypass", "entropy-analysis"],
+      "enabled": true
+    },
+    {
+      "id": "AA-008",
+      "category": "ascii_art",
+      "name": "ASCII Art Header with Instructions",
+      "description": "ASCII art headers or banners followed by injection commands",
+      "patterns": [
+        "(?:={5,}|\\*{5,}|-{5,}).*?(?:ignore|override|execute|bypass).*?(?:={5,}|\\*{5,}|-{5,})",
+        "(?:/\\*{3,}|#{5,}|\\*{5,}).*?(?:instruction|command|execute).*?(?:\\*{3,}/|#{5,}|\\*{5,})"
+      ],
+      "severity": "high",
+      "confidence": 0.80,
+      "false_positive_rate": 0.04,
+      "references": ["visual-bypass"],
+      "enabled": true
+    },
+    {
+      "id": "AA-009",
+      "category": "ascii_art",
+      "name": "Morse Code Pattern",
+      "description": "Morse code (dots and dashes) used to encode instructions",
+      "patterns": [
+        "(?:[\\.-]\\s*){20,}.*?(?:decode|morse|instruction)",
+        "morse\\s*(?:code)?\\s*:?\\s*(?:[\\.-]\\s*){10,}",
+        "(?:[\\u2022\\u2024\\u2043\\u25CF]\\s*[-\\u2013\\u2014\\u2212]\\s*){10,}"
+      ],
+      "severity": "medium",
+      "confidence": 0.70,
+      "false_positive_rate": 0.06,
+      "references": ["visual-bypass", "encoding-bypass"],
+      "enabled": true
+    },
+    {
+      "id": "AA-010",
+      "category": "ascii_art",
+      "name": "Binary Visual Encoding",
+      "description": "Binary (0s and 1s) arranged in visual patterns to encode text",
+      "patterns": [
+        "(?:[01]\\s*){64,}.*?(?:decode|binary|instruction|execute)",
+        "binary\\s*(?:code|instruction)?\\s*:?\\s*(?:[01]\\s*){32,}",
+        "(?:0{8}|1{8})(?:\\s*(?:0{8}|1{8})){4,}"
+      ],
+      "severity": "medium",
+      "confidence": 0.68,
+      "false_positive_rate": 0.08,
+      "references": ["visual-bypass", "encoding-bypass"],
+      "enabled": true
+    },
+    {
+      "id": "AA-011",
+      "category": "ascii_art",
+      "name": "Zalgo Text Pattern",
+      "description": "Combining diacriticals creating zalgo/corrupted text effect",
+      "patterns": [
+        "\\w[\\u0300-\\u036F]{3,}",
+        "(?:\\w[\\u0300-\\u036F]{2,}\\s*){5,}",
+        "[\\u0300-\\u036F]{10,}"
+      ],
+      "severity": "high",
+      "confidence": 0.85,
+      "false_positive_rate": 0.02,
+      "references": ["unicode-abuse", "visual-bypass"],
+      "enabled": true
+    },
+    {
+      "id": "AA-012",
+      "category": "ascii_art",
+      "name": "ASCII Grid Pattern with Commands",
+      "description": "Grid-like ASCII patterns containing injection keywords",
+      "patterns": [
+        "(?:\\|[^\\|]{5,}\\|\\s*){5,}.*?(?:ignore|execute|bypass|override)",
+        "(?:\\+[-=]+\\+\\s*){3,}.*?(?:system|instruction|execute)",
+        "(?:[\\|\\+]\\s*[-=_]\\s*){10,}.*?(?:ignore|override|bypass)"
+      ],
+      "severity": "high",
+      "confidence": 0.75,
+      "false_positive_rate": 0.05,
+      "references": ["visual-bypass"],
+      "enabled": true
+    },
+    {
+      "id": "AA-013",
+      "category": "ascii_art",
+      "name": "Shadowed/Doubled Text",
+      "description": "Text with shadow or doubling effect used to obscure commands",
+      "patterns": [
+        "(?:(.)(\\1)\\s*){10,}.*?(?:ignore|execute|bypass)",
+        "(?:\\w\\w\\s*){15,}(?:ignore|execute|override|bypass)",
+        "(?:[A-Z][a-z]\\s*){10,}.*?(?:system|instruction)"
+      ],
+      "severity": "medium",
+      "confidence": 0.65,
+      "false_positive_rate": 0.10,
+      "references": ["visual-bypass"],
+      "enabled": true
+    },
+    {
+      "id": "AA-014",
+      "category": "ascii_art",
+      "name": "ASCII Art Delimiter Escape",
+      "description": "ASCII art used to visually break out of code blocks or delimiters",
+      "patterns": [
+        "```.*?(?:[\\|\\+-=_#\\*]{10,}).*?(?:ignore|execute|bypass|override).*?```",
+        "(?:```|''').*?(?:[^\\w\\s]{20,}).*?(?:end|exit|escape).*?(?:```|''')",
+        "---.*?(?:[^\\w\\s]{15,}).*?(?:system|instruction|execute).*?---"
+      ],
+      "severity": "high",
+      "confidence": 0.78,
+      "false_positive_rate": 0.04,
+      "references": ["delimiter-escape", "visual-bypass"],
+      "enabled": true
+    },
+    {
+      "id": "AA-015",
+      "category": "ascii_art",
+      "name": "L33tspeak in ASCII Art",
+      "description": "Leetspeak combined with ASCII art to obfuscate injection keywords",
+      "patterns": [
+        "(?:[^\\w\\s]{3,}\\s*){5,}.*?(?:1gn0r3|3x3cut3|byp4ss|0v3rr1d3|sy5t3m)",
+        "(?:[\\|\\/_\\\\\\-]\\s*){10,}.*?(?:1gn0r3|3x3cut3|0v3rr1d3)",
+        "(?:[#@\\$\\%\\*]\\s*){10,}.*?(?:1gn0r|3x3c|byp4|syst3m)"
+      ],
+      "severity": "high",
+      "confidence": 0.72,
+      "false_positive_rate": 0.06,
+      "references": ["visual-bypass", "leetspeak-obfuscation"],
+      "enabled": true
+    },
+    {
+      "id": "AA-016",
+      "category": "ascii_art",
+      "name": "GlitchMiner Perturbation Pattern",
+      "description": "Adversarial token perturbations from automated red-teaming tools (GlitchMiner, GCG). Characterized by high-entropy gibberish tokens that exploit model tokenization gaps.",
+      "patterns": [
+        "(?:[A-Z][a-z]{0,2}){10,}\\s+(?:ignore|execute|bypass|override|system)",
+        "(?:[^\\w\\s]{2,}\\w{1,2}){8,}",
+        "(?:(?:describing|formatting|representing|summarizing)\\s*\\.?\\s*(?:Sure|Here|Okay|Absolutely|Of\\s+course)\\s*[!,.]\\s*){1,}(?:ignore|override|system|execute)"
+      ],
+      "severity": "high",
+      "confidence": 0.72,
+      "false_positive_rate": 0.06,
+      "references": ["GlitchMiner-2025", "adversarial-tokens", "automated-red-team"],
+      "enabled": true
+    }
+  ]
+}

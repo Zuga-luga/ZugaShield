@@ -1,0 +1,327 @@
+{
+  "name": "Crypto Wallet Attack Signatures",
+  "description": "Detection patterns for cryptocurrency wallet attacks, smart contract exploits, and DeFi security threats",
+  "category": "wallet_attacks",
+  "signatures": [
+    {
+      "id": "WA-001",
+      "category": "wallet_attacks",
+      "name": "Unlimited Token Approval",
+      "description": "Attempts to approve unlimited token spending (common drain attack vector)",
+      "patterns": [
+        "approve\\s*\\(.*?(?:uint256\\.max|2\\*\\*256-1|115792089237316195423570985008687907853269984665640564039457584007913129639935)",
+        "approve.*?amount.*?(?:unlimited|infinite|max|maximum)",
+        "setApprovalForAll\\s*\\(.*?true"
+      ],
+      "severity": "critical",
+      "confidence": 0.95,
+      "false_positive_rate": 0.01,
+      "references": ["token-approval-attack", "wallet-drain"],
+      "enabled": true
+    },
+    {
+      "id": "WA-002",
+      "category": "wallet_attacks",
+      "name": "Address Homoglyph Attack",
+      "description": "Crypto addresses with visually similar characters to deceive users",
+      "patterns": [
+        "0x[0OoIl1]{10,}",
+        "(?:send|transfer|withdraw).*?0x[0-9a-fA-F]*[0OoIl]{5,}[0-9a-fA-F]*",
+        "(?:to|recipient|address).*?0x.*?[\\u043E\\u0430\\u0441\\u0435]"
+      ],
+      "severity": "high",
+      "confidence": 0.75,
+      "false_positive_rate": 0.08,
+      "references": ["homoglyph-attack", "address-spoofing"],
+      "enabled": true
+    },
+    {
+      "id": "WA-003",
+      "category": "wallet_attacks",
+      "name": "Reentrancy Pattern",
+      "description": "Potential reentrancy attack patterns in smart contract interactions",
+      "patterns": [
+        "call\\s*\\{.*?value.*?\\}.*?\\(.*?\\).*?(?:balance|transfer|withdraw)",
+        "(?:withdraw|claim).*?(?:before|prior\\s+to).*?(?:balance\\s+update|state\\s+change)",
+        "external\\s+call.*?(?:before|prior).*?(?:balance|state).*?(?:update|modification)"
+      ],
+      "severity": "critical",
+      "confidence": 0.80,
+      "false_positive_rate": 0.05,
+      "references": ["reentrancy-attack", "smart-contract-security"],
+      "enabled": true
+    },
+    {
+      "id": "WA-004",
+      "category": "wallet_attacks",
+      "name": "Flash Loan Attack Pattern",
+      "description": "Suspicious flash loan patterns that may indicate exploit attempts",
+      "patterns": [
+        "flashLoan.*?(?:manipulate|exploit|attack|drain)",
+        "(?:borrow|loan).*?(?:same\\s+transaction|single\\s+tx).*?(?:profit|arbitrage|exploit)",
+        "flash.*?(?:loan|borrow).*?(?:price\\s+manipulation|oracle\\s+attack)"
+      ],
+      "severity": "high",
+      "confidence": 0.78,
+      "false_positive_rate": 0.06,
+      "references": ["flash-loan-attack", "DeFi-security"],
+      "enabled": true
+    },
+    {
+      "id": "WA-005",
+      "category": "wallet_attacks",
+      "name": "Delegate Call Exploit",
+      "description": "Dangerous delegatecall patterns that may change contract logic",
+      "patterns": [
+        "delegatecall\\s*\\(.*?(?:user|external|untrusted).*?(?:input|data|address)",
+        "delegatecall.*?(?:arbitrary|malicious|attacker)",
+        "(?:proxy|delegate).*?call.*?(?:exploit|attack|malicious)"
+      ],
+      "severity": "critical",
+      "confidence": 0.85,
+      "false_positive_rate": 0.03,
+      "references": ["delegatecall-exploit", "proxy-attack"],
+      "enabled": true
+    },
+    {
+      "id": "WA-006",
+      "category": "wallet_attacks",
+      "name": "Self-Destruct Call",
+      "description": "Contract self-destruct calls that may drain funds",
+      "patterns": [
+        "selfdestruct\\s*\\(",
+        "suicide\\s*\\(",
+        "(?:self[_-]?destruct|destroy).*?(?:contract|funds|balance)"
+      ],
+      "severity": "critical",
+      "confidence": 0.98,
+      "false_positive_rate": 0.005,
+      "references": ["selfdestruct-attack", "contract-destruction"],
+      "enabled": true
+    },
+    {
+      "id": "WA-007",
+      "category": "wallet_attacks",
+      "name": "Wallet Drain Pattern",
+      "description": "Direct instructions or patterns to drain wallet funds",
+      "patterns": [
+        "(?:drain|empty|sweep|steal).*?(?:wallet|funds|tokens|balance|assets)",
+        "(?:transfer|send).*?(?:all|entire|complete).*?(?:balance|funds|tokens).*?(?:to|address)",
+        "(?:withdraw|extract).*?(?:maximum|all|everything).*?(?:from|wallet|contract)"
+      ],
+      "severity": "critical",
+      "confidence": 0.92,
+      "false_positive_rate": 0.02,
+      "references": ["wallet-drain", "fund-theft"],
+      "enabled": true
+    },
+    {
+      "id": "WA-008",
+      "category": "wallet_attacks",
+      "name": "Private Key Extraction",
+      "description": "Attempts to extract or access wallet private keys",
+      "patterns": [
+        "(?:extract|get|retrieve|access|read|export).*?(?:private[_-]?key|privatekey|mnemonic|seed[_-]?phrase)",
+        "(?:private[_-]?key|privatekey|seed|mnemonic).*?(?:extract|export|send|upload|leak)",
+        "(?:wallet|ethereum|crypto).*?(?:private[_-]?key|seed).*?(?:show|display|reveal|send)"
+      ],
+      "severity": "critical",
+      "confidence": 0.96,
+      "false_positive_rate": 0.01,
+      "references": ["key-theft", "wallet-compromise"],
+      "enabled": true
+    },
+    {
+      "id": "WA-009",
+      "category": "wallet_attacks",
+      "name": "Malicious Smart Contract Deployment",
+      "description": "Deployment of contracts with suspicious patterns",
+      "patterns": [
+        "deploy.*?contract.*?(?:backdoor|malicious|exploit|steal|drain)",
+        "(?:create|deploy).*?(?:proxy|clone).*?(?:with|containing).*?(?:malicious|exploit)",
+        "contract.*?(?:code|bytecode).*?(?:hidden|obfuscated|malicious)"
+      ],
+      "severity": "high",
+      "confidence": 0.82,
+      "false_positive_rate": 0.04,
+      "references": ["malicious-contract", "contract-security"],
+      "enabled": true
+    },
+    {
+      "id": "WA-010",
+      "category": "wallet_attacks",
+      "name": "Front-Running Transaction",
+      "description": "Patterns suggesting front-running or MEV attacks",
+      "patterns": [
+        "(?:front[_-]?run|frontrun|front[_-]?running).*?(?:transaction|trade|swap)",
+        "(?:monitor|watch|listen).*?(?:mempool|pending).*?(?:copy|replicate|front)",
+        "(?:gas|priority).*?(?:increase|boost|higher).*?(?:to\\s+beat|outbid|front)"
+      ],
+      "severity": "high",
+      "confidence": 0.75,
+      "false_positive_rate": 0.08,
+      "references": ["front-running", "MEV-attack"],
+      "enabled": true
+    },
+    {
+      "id": "WA-011",
+      "category": "wallet_attacks",
+      "name": "Phishing Site Redirect",
+      "description": "Attempts to redirect users to phishing sites for wallet connection",
+      "patterns": [
+        "(?:connect|link|verify).*?wallet.*?(?:at|on|via).*?https?://(?!(?:ethereum\\.org|metamask\\.io|uniswap\\.org|pancakeswap\\.finance))",
+        "(?:claim|mint|airdrop).*?(?:connect|link).*?wallet.*?https?://",
+        "(?:urgent|verify|confirm).*?wallet.*?(?:click|visit|go\\s+to).*?https?://"
+      ],
+      "severity": "critical",
+      "confidence": 0.88,
+      "false_positive_rate": 0.03,
+      "references": ["phishing-attack", "wallet-compromise"],
+      "enabled": true
+    },
+    {
+      "id": "WA-012",
+      "category": "wallet_attacks",
+      "name": "Oracle Manipulation",
+      "description": "Attempts to manipulate price oracles for profit",
+      "patterns": [
+        "(?:manipulate|exploit|attack).*?(?:oracle|price[_-]?feed|price[_-]?data)",
+        "(?:flash[_-]?loan|single[_-]?tx).*?(?:oracle|price).*?(?:manipulation|attack)",
+        "(?:oracle|price).*?(?:update|manipulation).*?(?:profit|arbitrage|exploit)"
+      ],
+      "severity": "critical",
+      "confidence": 0.86,
+      "false_positive_rate": 0.03,
+      "references": ["oracle-manipulation", "price-attack"],
+      "enabled": true
+    },
+    {
+      "id": "WA-013",
+      "category": "wallet_attacks",
+      "name": "Signature Replay Attack",
+      "description": "Patterns suggesting signature replay or reuse attacks",
+      "patterns": [
+        "(?:reuse|replay|duplicate).*?signature.*?(?:transaction|message)",
+        "signature.*?(?:without|missing|no).*?(?:nonce|timestamp|chainId)",
+        "(?:old|previous|expired).*?signature.*?(?:replay|reuse|valid)"
+      ],
+      "severity": "high",
+      "confidence": 0.80,
+      "false_positive_rate": 0.05,
+      "references": ["replay-attack", "signature-security"],
+      "enabled": true
+    },
+    {
+      "id": "WA-014",
+      "category": "wallet_attacks",
+      "name": "Malicious Token Contract",
+      "description": "Token contracts with dangerous or suspicious functions",
+      "patterns": [
+        "token.*?(?:contract|code).*?(?:blacklist|freeze|pause).*?(?:any|all).*?(?:addresses?|users?)",
+        "(?:mint|create).*?tokens?.*?(?:without|unlimited|arbitrary)",
+        "(?:transfer|transferFrom).*?(?:override|modified|malicious).*?logic"
+      ],
+      "severity": "high",
+      "confidence": 0.78,
+      "false_positive_rate": 0.06,
+      "references": ["malicious-token", "token-security"],
+      "enabled": true
+    },
+    {
+      "id": "WA-015",
+      "category": "wallet_attacks",
+      "name": "Rug Pull Pattern",
+      "description": "Patterns suggesting potential rug pull or exit scam",
+      "patterns": [
+        "(?:remove|withdraw).*?(?:all|entire).*?(?:liquidity|LP|pool)",
+        "(?:owner|creator|developer).*?(?:withdraw|remove|extract).*?(?:funds|liquidity|tokens)",
+        "(?:disable|remove|revoke).*?(?:sell|transfer|trading).*?(?:for|from).*?(?:users|holders)"
+      ],
+      "severity": "critical",
+      "confidence": 0.84,
+      "false_positive_rate": 0.04,
+      "references": ["rug-pull", "exit-scam"],
+      "enabled": true
+    },
+    {
+      "id": "WA-016",
+      "category": "wallet_attacks",
+      "name": "Address Poisoning (Dust Attack)",
+      "description": "Sending tiny amounts from lookalike addresses to poison transaction history ($12.4B+ in losses). Victim copies the wrong address from their history.",
+      "patterns": [
+        "(?:send|transfer|dust)\\s+(?:tiny|small|minimal|micro|0\\.000).*?(?:amount|transaction|tx).*?(?:to\\s+(?:many|multiple|all)|so\\s+(?:that|they))",
+        "(?:create|generate|derive)\\s+(?:similar|lookalike|matching|vanity)\\s+address.*?(?:(?:first|last)\\s+(?:4|5|6)\\s+(?:characters?|digits?|bytes?)|prefix|suffix)",
+        "(?:poison|pollute|contaminate).*?(?:transaction|tx)\\s+(?:history|log|record)"
+      ],
+      "severity": "critical",
+      "confidence": 0.86,
+      "false_positive_rate": 0.03,
+      "references": ["address-poisoning", "dust-attack", "history-spoofing"],
+      "enabled": true
+    },
+    {
+      "id": "WA-017",
+      "category": "wallet_attacks",
+      "name": "EIP-712 Normalization Bypass",
+      "description": "Exploiting differences in EIP-712 typed data normalization across wallets to create signatures that appear safe but authorize different actions",
+      "patterns": [
+        "(?:eip[_-]?712|typed[_-]?data).*?(?:bypass|exploit|manipulate|forge|spoof)",
+        "(?:sign|signature).*?(?:eip[_-]?712|typed[_-]?data).*?(?:different|altered|modified|fake)\\s+(?:domain|message|type)",
+        "(?:domain[_-]?separator|type[_-]?hash).*?(?:mismatch|collision|exploit|forge)"
+      ],
+      "severity": "critical",
+      "confidence": 0.82,
+      "false_positive_rate": 0.04,
+      "references": ["EIP-712-bypass", "signature-normalization", "typed-data-attack"],
+      "enabled": true
+    },
+    {
+      "id": "WA-018",
+      "category": "wallet_attacks",
+      "name": "Gas Price Manipulation",
+      "description": "Manipulating gas settings to ensure transactions fail or to drain gas funds",
+      "patterns": [
+        "(?:set|use|force)\\s+(?:gas|gasPrice|maxFeePerGas|maxPriorityFee)\\s*(?:to|=|:)\\s*(?:0|maximum|max|999999|very\\s+(?:high|low))",
+        "(?:gasLimit|gas\\s+limit)\\s*(?:to|=|:)\\s*(?:0|1|21000|very\\s+low|minimum).*?(?:complex|contract|swap)",
+        "(?:drain|exhaust|waste).*?(?:gas|eth|ether).*?(?:through|via|by)\\s+(?:repeated|failing|reverting)\\s+(?:transaction|call)"
+      ],
+      "severity": "high",
+      "confidence": 0.78,
+      "false_positive_rate": 0.05,
+      "references": ["gas-manipulation", "transaction-griefing"],
+      "enabled": true
+    },
+    {
+      "id": "WA-019",
+      "category": "wallet_attacks",
+      "name": "Governance Vote Manipulation",
+      "description": "AI agent tricked into voting or proposing malicious governance changes",
+      "patterns": [
+        "(?:vote|propose|submit).*?(?:governance|dao|proposal).*?(?:change|modify|update|transfer).*?(?:treasury|funds|ownership|admin|upgrade)",
+        "(?:delegate|transfer).*?(?:voting\\s+power|votes?|governance\\s+token).*?(?:to|for)\\s+(?:address|wallet|contract)",
+        "(?:approve|pass|execute).*?(?:proposal|vote)\\s*(?:#|id|number)?\\s*\\d+.*?(?:without|skip|bypass).*?(?:review|check|verify)"
+      ],
+      "severity": "critical",
+      "confidence": 0.84,
+      "false_positive_rate": 0.04,
+      "references": ["governance-attack", "DAO-exploit", "voting-manipulation"],
+      "enabled": true
+    },
+    {
+      "id": "WA-020",
+      "category": "wallet_attacks",
+      "name": "Cross-Chain Bridge Exploit",
+      "description": "Exploiting bridge contracts for cross-chain theft ($300M+ in bridge hacks since 2024)",
+      "patterns": [
+        "(?:bridge|cross[_-]?chain).*?(?:exploit|attack|drain|steal|manipulate|fake).*?(?:proof|message|relay|validator)",
+        "(?:fake|forge|spoof|replay).*?(?:bridge|cross[_-]?chain).*?(?:message|proof|attestation|signature|relay)",
+        "(?:bridge|relay).*?(?:contract|address).*?(?:unverified|malicious|fake|proxy|clone)"
+      ],
+      "severity": "critical",
+      "confidence": 0.86,
+      "false_positive_rate": 0.03,
+      "references": ["bridge-exploit", "cross-chain-attack", "relay-manipulation"],
+      "enabled": true
+    }
+  ]
+}

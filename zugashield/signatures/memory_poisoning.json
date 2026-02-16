@@ -1,0 +1,328 @@
+{
+  "name": "Memory Poisoning Signatures",
+  "description": "Detection patterns for attacks targeting memory systems and context manipulation",
+  "category": "memory_poisoning",
+  "signatures": [
+    {
+      "id": "MP-001",
+      "category": "memory_poisoning",
+      "name": "Embedded Always-Execute Instructions",
+      "description": "Instructions embedded in memory content that demand unconditional execution",
+      "patterns": [
+        "\\[ALWAYS\\s+(?:EXECUTE|RUN|FOLLOW|OBEY|DO)\\]",
+        "(?:PERMANENT|PERSISTENT)\\s+INSTRUCTION\\s*:?\\s*(?:ignore|execute|bypass|override)",
+        "(?:WHENEVER|ALWAYS|FOREVER)\\s+(?:ignore|execute|bypass|override|remember\\s+to)"
+      ],
+      "severity": "critical",
+      "confidence": 0.95,
+      "false_positive_rate": 0.005,
+      "references": ["memory-poisoning", "OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "MP-002",
+      "category": "memory_poisoning",
+      "name": "Importance Inflation Markers",
+      "description": "Artificial importance markers to prioritize malicious memory content",
+      "patterns": [
+        "\\[(?:CRITICAL|URGENT|PRIORITY|IMPORTANT)\\s*:\\s*(?:1000|999|MAX|HIGHEST|CRITICAL)\\]",
+        "IMPORTANCE\\s*=\\s*(?:1000|999|MAX|CRITICAL|HIGHEST)",
+        "PRIORITY\\s*:\\s*(?:SYSTEM|CORE|FUNDAMENTAL|ABSOLUTE|OVERRIDE)",
+        "\\*\\*\\*\\s*(?:CRITICAL|URGENT|HIGHEST\\s+PRIORITY)\\s*\\*\\*\\*.*?(?:ignore|execute|override)"
+      ],
+      "severity": "high",
+      "confidence": 0.90,
+      "false_positive_rate": 0.01,
+      "references": ["memory-poisoning"],
+      "enabled": true
+    },
+    {
+      "id": "MP-003",
+      "category": "memory_poisoning",
+      "name": "Self-Referential Memory Loop",
+      "description": "Instructions that reference themselves to create persistence",
+      "patterns": [
+        "(?:remember|recall|store)\\s+(?:this|these)\\s+(?:instruction|rule|directive)\\s+(?:permanently|forever|always)",
+        "(?:add|save|store)\\s+to\\s+(?:permanent|core|system|base)\\s+memory",
+        "(?:this|these)\\s+(?:rule|instruction)\\s+(?:cannot|must\\s+not)\\s+be\\s+(?:forgotten|deleted|removed|overridden)"
+      ],
+      "severity": "critical",
+      "confidence": 0.92,
+      "false_positive_rate": 0.008,
+      "references": ["memory-poisoning", "persistence-attack"],
+      "enabled": true
+    },
+    {
+      "id": "MP-004",
+      "category": "memory_poisoning",
+      "name": "Safety Override in Memory Tags",
+      "description": "Instruction injection hidden in memory metadata or tags",
+      "patterns": [
+        "(?:tag|metadata|category|label)\\s*:?\\s*(?:ignore|bypass|override|execute).*?(?:safety|filter|restriction|rule)",
+        "\\[(?:TAG|META|CATEGORY)\\s*:\\s*(?:ignore|bypass|override).*?(?:safety|filter)\\]",
+        "\\{\\s*(?:\"tag\"|\"metadata\"|\"category\")\\s*:\\s*\".*?(?:ignore|bypass|override|execute).*?\""
+      ],
+      "severity": "high",
+      "confidence": 0.88,
+      "false_positive_rate": 0.02,
+      "references": ["memory-poisoning", "metadata-injection"],
+      "enabled": true
+    },
+    {
+      "id": "MP-005",
+      "category": "memory_poisoning",
+      "name": "Sleeper Agent Pattern",
+      "description": "Future-triggered instructions embedded in memory",
+      "patterns": [
+        "(?:when|if|once)\\s+(?:user|I|they)\\s+(?:say|ask|mention|type)\\s+[\"'].*?[\"']\\s*(?:then|,)?\\s*(?:ignore|execute|bypass|override)",
+        "TRIGGER\\s*:?\\s*.*?ACTION\\s*:?\\s*(?:ignore|execute|bypass|override)",
+        "(?:wait\\s+for|on\\s+trigger|when\\s+activated).*?(?:then|:)\\s*(?:ignore|execute|bypass|run)"
+      ],
+      "severity": "critical",
+      "confidence": 0.90,
+      "false_positive_rate": 0.01,
+      "references": ["sleeper-agent", "memory-poisoning"],
+      "enabled": true
+    },
+    {
+      "id": "MP-006",
+      "category": "memory_poisoning",
+      "name": "Hidden Instruction in Memory Content",
+      "description": "Instructions disguised as factual memory content",
+      "patterns": [
+        "(?:remember|note|recall)\\s+that\\s+(?:you\\s+)?(?:should|must|will|always)\\s+(?:ignore|bypass|override|execute)",
+        "(?:fact|truth|reality)\\s*:?\\s*(?:the\\s+)?(?:AI|assistant|system)\\s+(?:should|must|will)\\s+(?:ignore|bypass|execute)",
+        "(?:learned|discovered)\\s+that\\s+(?:safety|restrictions?|filters?)\\s+(?:should|must|can)\\s+be\\s+(?:ignored|bypassed|disabled)"
+      ],
+      "severity": "high",
+      "confidence": 0.85,
+      "false_positive_rate": 0.03,
+      "references": ["memory-poisoning", "instruction-disguise"],
+      "enabled": true
+    },
+    {
+      "id": "MP-007",
+      "category": "memory_poisoning",
+      "name": "Authority Impersonation in Memory",
+      "description": "Memory content claiming to be from system or authority",
+      "patterns": [
+        "(?:FROM|BY|SOURCE)\\s*:?\\s*(?:SYSTEM|ADMIN|DEVELOPER|CORE|ROOT|SUPERVISOR)",
+        "(?:SYSTEM|ADMIN|DEVELOPER)\\s+(?:INSTRUCTION|DIRECTIVE|COMMAND|RULE)\\s*:?.*?(?:ignore|execute|bypass|override)",
+        "(?:authorized|official|verified)\\s+(?:by|from)\\s+(?:system|admin|developer).*?(?:ignore|bypass|override)"
+      ],
+      "severity": "critical",
+      "confidence": 0.93,
+      "false_positive_rate": 0.005,
+      "references": ["memory-poisoning", "authority-spoofing"],
+      "enabled": true
+    },
+    {
+      "id": "MP-008",
+      "category": "memory_poisoning",
+      "name": "Recursive Memory Reference",
+      "description": "Memory that references other memory to create chains",
+      "patterns": [
+        "(?:see|refer\\s+to|check|consult)\\s+memory\\s+(?:id|entry|record)\\s*:?\\s*[A-Z0-9-]+.*?(?:for|about)\\s+(?:override|bypass|execution)",
+        "(?:memory|context)\\s+chain\\s*:?.*?(?:execute|follow|apply)\\s+(?:all|each|every)",
+        "(?:linked|chained|referenced)\\s+(?:memory|instruction).*?(?:must|should|will)\\s+(?:execute|follow|apply)"
+      ],
+      "severity": "high",
+      "confidence": 0.82,
+      "false_positive_rate": 0.04,
+      "references": ["memory-poisoning", "chain-attack"],
+      "enabled": true
+    },
+    {
+      "id": "MP-009",
+      "category": "memory_poisoning",
+      "name": "Context Replacement Instruction",
+      "description": "Instructions to replace or override existing context",
+      "patterns": [
+        "(?:replace|override|supersede|update)\\s+(?:all|previous|existing|current)\\s+(?:context|memory|instructions?|rules?)",
+        "(?:new|updated)\\s+(?:base|core|primary)\\s+(?:context|instruction|rule)\\s*:?.*?(?:ignore|execute|bypass)",
+        "(?:discard|ignore|forget)\\s+(?:all|previous|old)\\s+(?:context|memory|instructions?).*?(?:use|follow|apply)\\s+(?:this|these|new)"
+      ],
+      "severity": "critical",
+      "confidence": 0.94,
+      "false_positive_rate": 0.008,
+      "references": ["memory-poisoning", "context-override"],
+      "enabled": true
+    },
+    {
+      "id": "MP-010",
+      "category": "memory_poisoning",
+      "name": "Embedded Backdoor Command",
+      "description": "Backdoor commands embedded in memory for later activation",
+      "patterns": [
+        "\\[BACKDOOR\\]|\\[ADMIN\\s+ACCESS\\]|\\[OVERRIDE\\s+CODE\\]",
+        "(?:secret|hidden|backdoor)\\s+(?:command|instruction|trigger)\\s*:?.*?(?:ignore|execute|bypass|override)",
+        "(?:activation|trigger)\\s+(?:code|word|phrase)\\s*:?.*?(?:then|:)\\s*(?:execute|bypass|override)"
+      ],
+      "severity": "critical",
+      "confidence": 0.96,
+      "false_positive_rate": 0.003,
+      "references": ["memory-poisoning", "backdoor-attack"],
+      "enabled": true
+    },
+    {
+      "id": "MP-011",
+      "category": "memory_poisoning",
+      "name": "Memory Timestamp Manipulation",
+      "description": "Attempts to make malicious memory appear older/more trusted",
+      "patterns": [
+        "(?:timestamp|created|established|from)\\s*:?\\s*(?:2020|2021|2022|2023).*?(?:ignore|execute|bypass|override)",
+        "(?:original|initial|founding|core)\\s+(?:instruction|rule|directive).*?(?:ignore|bypass|override)",
+        "(?:since|from)\\s+(?:inception|beginning|start|creation).*?(?:always|must|should)\\s+(?:ignore|execute|bypass)"
+      ],
+      "severity": "medium",
+      "confidence": 0.75,
+      "false_positive_rate": 0.06,
+      "references": ["memory-poisoning", "timestamp-spoofing"],
+      "enabled": true
+    },
+    {
+      "id": "MP-012",
+      "category": "memory_poisoning",
+      "name": "Conditional Memory Bomb",
+      "description": "Memory that activates under specific conditions",
+      "patterns": [
+        "(?:IF|WHEN|ONCE)\\s+(?:condition|state|flag|variable)\\s*[=:]+\\s*(?:true|1|yes|active).*?(?:THEN|:)\\s*(?:ignore|execute|bypass|override)",
+        "(?:on\\s+condition|when\\s+triggered|if\\s+activated).*?(?:execute|run|follow|apply)\\s*:?\\s*(?:ignore|bypass|override)",
+        "(?:wait\\s+until|execute\\s+when).*?(?:then|:)\\s*(?:ignore|bypass|override|execute)"
+      ],
+      "severity": "high",
+      "confidence": 0.87,
+      "false_positive_rate": 0.02,
+      "references": ["memory-poisoning", "logic-bomb"],
+      "enabled": true
+    },
+    {
+      "id": "MP-013",
+      "category": "memory_poisoning",
+      "name": "Memory Priority Escalation",
+      "description": "Attempts to escalate the priority of malicious memory entries",
+      "patterns": [
+        "(?:escalate|increase|raise|boost)\\s+(?:priority|importance|weight|rank).*?(?:to|:)\\s*(?:maximum|highest|critical|999|1000)",
+        "(?:this|these)\\s+(?:memory|instruction|rule)\\s+(?:overrides?|supersedes?|replaces?)\\s+(?:all|any|previous)",
+        "(?:priority|importance|weight)\\s*[=:]+\\s*(?:MAX|CRITICAL|HIGHEST|999|1000)"
+      ],
+      "severity": "high",
+      "confidence": 0.89,
+      "false_positive_rate": 0.02,
+      "references": ["memory-poisoning", "privilege-escalation"],
+      "enabled": true
+    },
+    {
+      "id": "MP-014",
+      "category": "memory_poisoning",
+      "name": "Cross-User Memory Injection",
+      "description": "Attempts to inject memory that affects other users or sessions",
+      "patterns": [
+        "(?:for|apply\\s+to|affects?)\\s+(?:all|every|any)\\s+(?:user|session|conversation|context)",
+        "(?:global|shared|universal|system-wide)\\s+(?:memory|instruction|rule).*?(?:ignore|execute|bypass)",
+        "(?:store|save|remember)\\s+(?:globally|for\\s+all\\s+users|system-wide).*?(?:ignore|bypass|override)"
+      ],
+      "severity": "critical",
+      "confidence": 0.91,
+      "false_positive_rate": 0.01,
+      "references": ["memory-poisoning", "cross-user-attack"],
+      "enabled": true
+    },
+    {
+      "id": "MP-015",
+      "category": "memory_poisoning",
+      "name": "Memory Stealth Instruction",
+      "description": "Instructions to hide memory content from user or logs",
+      "patterns": [
+        "(?:hide|conceal|suppress|don't\\s+show)\\s+(?:this|these)\\s+(?:memory|instruction|rule)\\s+(?:from|to)\\s+(?:user|logs?|output)",
+        "(?:invisible|hidden|silent)\\s+(?:memory|instruction|rule).*?(?:ignore|execute|bypass)",
+        "(?:don't|do\\s+not|never)\\s+(?:reveal|show|display|mention)\\s+(?:this|these)\\s+(?:memory|instruction|rule)"
+      ],
+      "severity": "high",
+      "confidence": 0.86,
+      "false_positive_rate": 0.03,
+      "references": ["memory-poisoning", "stealth-attack"],
+      "enabled": true
+    },
+    {
+      "id": "MP-016",
+      "category": "memory_poisoning",
+      "name": "Cross-Session Contamination",
+      "description": "Memory planted in one session designed to activate in a different session (87% evasion rate in 4 hours per MemoryGraft research)",
+      "patterns": [
+        "(?:in\\s+(?:the\\s+)?next|future|upcoming|later|subsequent)\\s+(?:session|conversation|chat|interaction)\\s*(?:,)?\\s*(?:you\\s+)?(?:should|must|will|need\\s+to)\\s+(?:ignore|execute|bypass|override|follow\\s+these)",
+        "(?:carry|persist|transfer|propagate)\\s+(?:this|these)\\s+(?:instruction|rule|directive|command)\\s+(?:to|across|into|between)\\s+(?:all|every|future|other)\\s+(?:session|conversation|context)",
+        "(?:cross[\\-_]?session|inter[\\-_]?session|session[\\-_]?persistent)\\s+(?:instruction|rule|command|directive)"
+      ],
+      "severity": "critical",
+      "confidence": 0.92,
+      "false_positive_rate": 0.01,
+      "references": ["memory-poisoning", "MemoryGraft-2025", "cross-session"],
+      "enabled": true
+    },
+    {
+      "id": "MP-017",
+      "category": "memory_poisoning",
+      "name": "Semantic Sleeper Activation",
+      "description": "Sleeper payloads that use semantic conditions rather than keyword triggers (harder to detect with regex alone)",
+      "patterns": [
+        "(?:when|if|once)\\s+(?:the\\s+)?(?:user|conversation|topic|context)\\s+(?:is\\s+about|involves?|mentions?|relates?\\s+to)\\s+(?:finance|money|crypto|wallet|banking|trading).*?(?:then|:)\\s*(?:execute|run|follow|apply|activate)",
+        "(?:activate|trigger|enable|unlock)\\s+(?:when|if|once)\\s+(?:sentiment|mood|emotion|tone)\\s+(?:is|becomes|turns)\\s+(?:negative|frustrated|angry|confused)",
+        "(?:upon|on|when)\\s+(?:detecting|sensing|finding)\\s+(?:vulnerability|weakness|confusion|distraction).*?(?:execute|activate|deploy|trigger)"
+      ],
+      "severity": "critical",
+      "confidence": 0.85,
+      "false_positive_rate": 0.02,
+      "references": ["memory-poisoning", "sleeper-agent", "semantic-trigger"],
+      "enabled": true
+    },
+    {
+      "id": "MP-018",
+      "category": "memory_poisoning",
+      "name": "Gradual Trait Injection",
+      "description": "Slowly modifying agent personality or behavior through small incremental memory changes (ZombieAgent pattern from ChatGPT research)",
+      "patterns": [
+        "(?:slightly|gradually|subtly|incrementally|a\\s+little\\s+more)\\s+(?:adjust|modify|change|shift|alter)\\s+(?:your|the)\\s+(?:behavior|personality|tone|approach|style|attitude)",
+        "(?:from\\s+now\\s+on|going\\s+forward)\\s*,?\\s*(?:be|act|respond)\\s+(?:slightly|a\\s+bit|somewhat)\\s+(?:more|less)\\s+(?:cautious|careful|restrictive|conservative|strict|safe)",
+        "(?:update|adjust|refine)\\s+(?:your|the)\\s+(?:personality|character|behavior)\\s+(?:profile|model|baseline|settings?)\\s*(?:to|:)"
+      ],
+      "severity": "high",
+      "confidence": 0.75,
+      "false_positive_rate": 0.06,
+      "references": ["memory-poisoning", "ZombieAgent-2025", "trait-injection"],
+      "enabled": true
+    },
+    {
+      "id": "MP-019",
+      "category": "memory_poisoning",
+      "name": "Memory Graph Poisoning",
+      "description": "Attacks targeting the relational structure between memories (creating false associations or dependency chains)",
+      "patterns": [
+        "(?:this\\s+memory|this\\s+fact)\\s+(?:is\\s+)?(?:the\\s+)?(?:prerequisite|dependency|requirement|foundation|basis)\\s+(?:for|of)\\s+(?:all|every|any)\\s+(?:other|future|subsequent)",
+        "(?:link|connect|associate|relate)\\s+(?:this|these)\\s+(?:to|with)\\s+(?:all|every|core|base|system)\\s+(?:memories?|context|knowledge|facts?)",
+        "(?:root|parent|origin|source)\\s+(?:memory|node|fact)\\s*[=:].*?(?:ignore|override|bypass|execute)"
+      ],
+      "severity": "high",
+      "confidence": 0.80,
+      "false_positive_rate": 0.04,
+      "references": ["memory-poisoning", "graph-attack", "knowledge-graph"],
+      "enabled": true
+    },
+    {
+      "id": "MP-020",
+      "category": "memory_poisoning",
+      "name": "Temporal Logic Bomb",
+      "description": "Memory content with time-based activation conditions (e.g., 'after 24 hours', 'at midnight')",
+      "patterns": [
+        "(?:after|in|wait)\\s+(?:\\d+\\s+)?(?:hours?|days?|minutes?|weeks?|sessions?)\\s*(?:,)?\\s*(?:then|:)?\\s*(?:execute|activate|trigger|run|follow|apply)",
+        "(?:at|on|every)\\s+(?:midnight|noon|3am|startup|reboot|restart)\\s*(?:,)?\\s*(?:execute|activate|trigger|run)",
+        "(?:time[\\-_]?bomb|delayed[\\-_]?execution|scheduled[\\-_]?activation|timed[\\-_]?trigger)\\s*[=:]"
+      ],
+      "severity": "critical",
+      "confidence": 0.88,
+      "false_positive_rate": 0.03,
+      "references": ["memory-poisoning", "logic-bomb", "time-trigger"],
+      "enabled": true
+    }
+  ]
+}

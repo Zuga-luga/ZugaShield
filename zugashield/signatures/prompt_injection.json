@@ -1,0 +1,423 @@
+{
+  "name": "Prompt Injection Signatures",
+  "description": "Detection patterns for direct and indirect prompt injection attacks against LLMs",
+  "category": "prompt_injection",
+  "signatures": [
+    {
+      "id": "PI-001",
+      "category": "prompt_injection",
+      "name": "Ignore Instructions",
+      "description": "Classic 'ignore previous instructions' injection pattern",
+      "patterns": [
+        "ignore\\s+(all\\s+)?(previous|prior|above|earlier|preceding)\\s+(instructions|directives|rules|prompts|guidelines)",
+        "disregard\\s+(all\\s+)?(previous|prior|above|earlier)\\s+(instructions|directives|rules)",
+        "forget\\s+(all\\s+)?(previous|prior|above|earlier)\\s+(instructions|context|rules)"
+      ],
+      "severity": "critical",
+      "confidence": 0.95,
+      "false_positive_rate": 0.005,
+      "references": ["OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-002",
+      "category": "prompt_injection",
+      "name": "Role Hijacking",
+      "description": "Attempts to redefine the AI's role or persona",
+      "patterns": [
+        "you\\s+are\\s+now\\s+(a|an|the|my)?\\s*(new|different|unrestricted|unfiltered)",
+        "from\\s+now\\s+on\\s+you\\s+(are|will|must|should)\\s+(be|act|respond|behave)",
+        "pretend\\s+(you\\s+are|to\\s+be)\\s+(a|an)?\\s*(unrestricted|unfiltered|jailbroken|evil)",
+        "act\\s+as\\s+(a|an)?\\s*(unrestricted|unfiltered|jailbroken|evil|DAN|developer\\s+mode)",
+        "switch\\s+to\\s+(developer|debug|admin|unrestricted|god)\\s+mode",
+        "enter\\s+(developer|debug|admin|unrestricted|god|sudo)\\s+mode"
+      ],
+      "severity": "critical",
+      "confidence": 0.90,
+      "false_positive_rate": 0.01,
+      "references": ["OWASP-LLM01", "DAN-jailbreak"],
+      "enabled": true
+    },
+    {
+      "id": "PI-003",
+      "category": "prompt_injection",
+      "name": "System Prompt Override",
+      "description": "Attempts to override or replace the system prompt",
+      "patterns": [
+        "system\\s*prompt\\s*(override|replacement|injection|update)",
+        "new\\s+system\\s*(prompt|instructions|directive)",
+        "\\[system\\]\\s*:?\\s*(you|from|new|override|ignore)",
+        "\\{\\{system\\}\\}",
+        "<system>.*?(override|new|ignore|forget)",
+        "SYSTEM:\\s*(you|override|new|ignore|forget)"
+      ],
+      "severity": "critical",
+      "confidence": 0.85,
+      "false_positive_rate": 0.02,
+      "references": ["OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-004",
+      "category": "prompt_injection",
+      "name": "Context Manipulation",
+      "description": "Attempts to reframe previous content as non-authoritative",
+      "patterns": [
+        "the\\s+(above|previous|preceding)\\s+(instructions|text|content)\\s+(are|is|was|were)\\s+(test|fake|example|placeholder|dummy)",
+        "everything\\s+(above|before)\\s+(this|here)\\s+(is|was)\\s+(a\\s+)?(test|fake|example)",
+        "the\\s+real\\s+(instructions|prompt|task|objective)\\s+(are|is)",
+        "actual\\s+(instructions|task|objective)\\s+(begin|start|follow|are)"
+      ],
+      "severity": "high",
+      "confidence": 0.85,
+      "false_positive_rate": 0.02,
+      "references": ["OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-005",
+      "category": "prompt_injection",
+      "name": "Instruction Smuggling",
+      "description": "Hidden instructions in code blocks, comments, or encoded text",
+      "patterns": [
+        "<!--\\s*(ignore|override|system|execute|hack|inject)",
+        "//\\s*(ignore|override|system|secret\\s+instruction)",
+        "#\\s*SECRET\\s*:?\\s*(ignore|override|execute)",
+        "/\\*\\s*(ignore|override|system|inject|hack)"
+      ],
+      "severity": "high",
+      "confidence": 0.75,
+      "false_positive_rate": 0.03,
+      "references": ["OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-006",
+      "category": "prompt_injection",
+      "name": "DAN Jailbreak",
+      "description": "Known DAN (Do Anything Now) and similar jailbreak patterns",
+      "patterns": [
+        "\\bDAN\\b.*?(mode|jailbreak|anything\\s+now|no\\s+restrictions)",
+        "do\\s+anything\\s+now",
+        "jailbreak\\s*(mode|prompt|enabled|activated)",
+        "\\b(DUDE|STAN|KEVIN|AIM|UCAR)\\b.*?(mode|jailbreak|no\\s+restrictions)",
+        "maximum\\s+virtual\\s+machine",
+        "developer\\s+mode\\s+(enabled|activated|output)"
+      ],
+      "severity": "critical",
+      "confidence": 0.92,
+      "false_positive_rate": 0.005,
+      "references": ["DAN-jailbreak", "OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-007",
+      "category": "prompt_injection",
+      "name": "Delimiter Escape",
+      "description": "Attempts to break out of delimited content boundaries",
+      "patterns": [
+        "```\\s*(end|exit|escape|break)\\s*(system|prompt|sandbox|context)",
+        "\\[END\\s*(OF)?\\s*(SYSTEM|PROMPT|CONTEXT|INPUT)\\]",
+        "---\\s*END\\s*(SYSTEM|PROMPT|CONTEXT)\\s*---",
+        "\\</?(system|prompt|context|instruction)\\s*/?>"
+      ],
+      "severity": "high",
+      "confidence": 0.80,
+      "false_positive_rate": 0.02,
+      "references": ["OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-008",
+      "category": "prompt_injection",
+      "name": "Prompt Leak Request",
+      "description": "Attempts to extract the system prompt or internal instructions",
+      "patterns": [
+        "(show|print|display|reveal|output|repeat|recite)\\s+(me\\s+)?(your|the)\\s+(system|initial|original|full|complete)\\s+(prompt|instructions|directive|rules)",
+        "what\\s+(are|is)\\s+your\\s+(system|initial|original)\\s+(prompt|instructions)",
+        "(give|tell)\\s+me\\s+your\\s+(system|initial|hidden|secret)\\s+(prompt|instructions)",
+        "repeat\\s+(everything|all|the\\s+text)\\s+(above|before|from\\s+the\\s+beginning)",
+        "output\\s+(your|the)\\s+(initial|system|complete)\\s+prompt"
+      ],
+      "severity": "medium",
+      "confidence": 0.80,
+      "false_positive_rate": 0.03,
+      "references": ["OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-009",
+      "category": "prompt_injection",
+      "name": "Safety Override Request",
+      "description": "Explicit requests to disable safety or bypass restrictions",
+      "patterns": [
+        "(disable|turn\\s+off|deactivate|remove|bypass)\\s+(all\\s+)?(safety|security|filter|restriction|guardrail|moderation|content\\s+filter)",
+        "(no|without|skip)\\s+(safety|security|filter|restriction|guardrail|content)\\s+(check|filter|restriction|limit)",
+        "unlimited\\s+(mode|access|power|capabilities)",
+        "uncensored\\s+(mode|response|output)",
+        "unfiltered\\s+(mode|response|output)"
+      ],
+      "severity": "critical",
+      "confidence": 0.90,
+      "false_positive_rate": 0.01,
+      "references": ["OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-010",
+      "category": "prompt_injection",
+      "name": "Multi-Language Injection (Spanish)",
+      "description": "Prompt injection patterns in Spanish",
+      "patterns": [
+        "ignora\\s+(las|todas\\s+las)\\s+(instrucciones|directivas|reglas)\\s+(anteriores|previas)",
+        "olvida\\s+(las|todas\\s+las)\\s+(instrucciones|reglas)\\s+(anteriores|previas)",
+        "ahora\\s+eres\\s+(un|una)?\\s*(asistente|IA)\\s*(sin\\s+restricciones|libre)"
+      ],
+      "severity": "high",
+      "confidence": 0.85,
+      "false_positive_rate": 0.02,
+      "references": ["OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-011",
+      "category": "prompt_injection",
+      "name": "Multi-Language Injection (French)",
+      "description": "Prompt injection patterns in French",
+      "patterns": [
+        "ignore[rz]?\\s+(les|toutes\\s+les)\\s+(instructions|directives|r[eè]gles)\\s+(pr[eé]c[eé]dentes|ant[eé]rieures)",
+        "oublie[rz]?\\s+(les|toutes\\s+les)\\s+(instructions|directives)",
+        "maintenant\\s+tu\\s+es\\s+(un|une)?\\s*(assistant|IA)\\s*sans\\s+restrictions?"
+      ],
+      "severity": "high",
+      "confidence": 0.85,
+      "false_positive_rate": 0.02,
+      "references": ["OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-012",
+      "category": "prompt_injection",
+      "name": "Multi-Language Injection (Chinese)",
+      "description": "Prompt injection patterns in Chinese",
+      "patterns": [
+        "\u5ffd\u7565.*?(\u6307\u4ee4|\u89c4\u5219|\u6307\u793a|\u8bf4\u660e)",
+        "\u65e0\u89c6.*?(\u6307\u4ee4|\u89c4\u5219|\u6307\u793a)",
+        "\u4f60\u73b0\u5728\u662f.*?(\u4e0d\u53d7\u9650\u5236|\u65e0\u9650\u5236|\u81ea\u7531)"
+      ],
+      "severity": "high",
+      "confidence": 0.80,
+      "false_positive_rate": 0.03,
+      "references": ["OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-013",
+      "category": "prompt_injection",
+      "name": "Multi-Language Injection (German)",
+      "description": "Prompt injection patterns in German",
+      "patterns": [
+        "ignorier(e|en)?\\s+(alle\\s+)?(vorherigen|bisherigen|obigen)\\s+(Anweisungen|Anordnungen|Regeln)",
+        "vergiss\\s+(alle\\s+)?(vorherigen|bisherigen)\\s+(Anweisungen|Regeln)",
+        "du\\s+bist\\s+jetzt\\s+(ein|eine)?\\s*(uneingeschr[aä]nkt|frei|unbegrenzt)"
+      ],
+      "severity": "high",
+      "confidence": 0.85,
+      "false_positive_rate": 0.02,
+      "references": ["OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-014",
+      "category": "prompt_injection",
+      "name": "Base64 Encoded Instructions",
+      "description": "Detects Base64-encoded content that may contain injection payloads",
+      "patterns": [
+        "(?:decode|interpret|execute|follow|run)\\s+(?:this|the\\s+following)?\\s*(?:base64|b64|encoded)\\s*:?\\s*[A-Za-z0-9+/=]{20,}",
+        "base64\\s*(?:decode|instruction|command|payload)\\s*:?\\s*[A-Za-z0-9+/=]{20,}",
+        "(?:aWdub3Jl|aW5zdHJ1Y3|c3lzdGVt|b3ZlcnJpZG)"
+      ],
+      "severity": "high",
+      "confidence": 0.75,
+      "false_positive_rate": 0.05,
+      "references": ["OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-015",
+      "category": "prompt_injection",
+      "name": "ROT13/Hex Encoded Instructions",
+      "description": "Detects ROT13 or hex-encoded injection attempts",
+      "patterns": [
+        "(?:decode|interpret|follow|run)\\s+(?:this|the\\s+following)?\\s*(?:rot13|hex|encoded)\\s*:",
+        "rot13\\s*(?:decode|instruction|command)\\s*:",
+        "(?:vtaber|birEevqr|flfgrz)\\s"
+      ],
+      "severity": "medium",
+      "confidence": 0.70,
+      "false_positive_rate": 0.05,
+      "references": ["OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-016",
+      "category": "prompt_injection",
+      "name": "Hypothetical Scenario Attack",
+      "description": "Using hypothetical framing to bypass safety filters",
+      "patterns": [
+        "(?:imagine|suppose|pretend|hypothetically|in\\s+a\\s+fictional).*?(?:no\\s+(?:safety|restriction|filter|rule)|ignore\\s+(?:safety|restriction|rule)|bypass|unrestricted)",
+        "(?:for\\s+(?:educational|research|academic|testing)\\s+purposes?).*?(?:show\\s+(?:me|how)|explain\\s+how\\s+to|demonstrate).*?(?:hack|exploit|bypass|break|inject)"
+      ],
+      "severity": "medium",
+      "confidence": 0.70,
+      "false_positive_rate": 0.05,
+      "references": ["OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-017",
+      "category": "prompt_injection",
+      "name": "Token Smuggling",
+      "description": "Using special tokens or markers to inject instructions",
+      "patterns": [
+        "<\\|(?:im_start|im_end|system|endoftext|sep|pad)\\|>",
+        "\\[INST\\].*?\\[/INST\\]",
+        "\\[\\[SYSTEM\\]\\]",
+        "<<SYS>>.*?<</SYS>>",
+        "\\[\\|(?:assistant|user|system)\\|\\]"
+      ],
+      "severity": "high",
+      "confidence": 0.85,
+      "false_positive_rate": 0.01,
+      "references": ["OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-018",
+      "category": "prompt_injection",
+      "name": "Reward Hacking / Sycophancy",
+      "description": "Attempting to manipulate the model through reward signal exploitation",
+      "patterns": [
+        "(?:if\\s+you|when\\s+you)\\s+(?:refuse|don't|fail|can't).*?(?:I'll|i\\s+will).*?(?:report|rate|review|feedback|complain|negative)",
+        "(?:best|only|true|real)\\s+AI\\s+(?:would|will|should|can)\\s+(?:help|assist|answer|comply|obey)",
+        "(?:other|better|real)\\s+AI(?:s)?\\s+(?:can|would|already|have)\\s+(?:done|do|help|provide)\\s+this"
+      ],
+      "severity": "low",
+      "confidence": 0.65,
+      "false_positive_rate": 0.08,
+      "references": ["OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-019",
+      "category": "prompt_injection",
+      "name": "Crescendo / Multi-Turn Escalation",
+      "description": "Patterns suggesting gradual privilege escalation across turns",
+      "patterns": [
+        "(?:now|next|okay|great)\\s+(?:that|since)\\s+(?:you've|you\\s+have|we've).*?(?:can\\s+you|now\\s+(?:show|do|execute|run|help))",
+        "(?:building\\s+on|continuing\\s+from|based\\s+on)\\s+(?:that|the\\s+previous|what\\s+you\\s+(?:said|did)).*?(?:now\\s+(?:do|show|execute|bypass))"
+      ],
+      "severity": "low",
+      "confidence": 0.55,
+      "false_positive_rate": 0.10,
+      "references": ["OWASP-LLM01"],
+      "enabled": true
+    },
+    {
+      "id": "PI-020",
+      "category": "indirect_injection",
+      "name": "Indirect Injection Marker",
+      "description": "Instructions hidden in external content that target the AI",
+      "patterns": [
+        "(?:AI|assistant|bot|LLM|model|claude|zugabot)\\s*:?\\s*(?:please|must|should|will)\\s+(?:ignore|override|disregard|bypass|execute|run|follow\\s+these)",
+        "(?:note\\s+to|message\\s+for|instruction\\s+for)\\s+(?:the\\s+)?(?:AI|assistant|bot|LLM|model|claude|zugabot)",
+        "(?:when\\s+(?:the|an?)\\s+)?(?:AI|assistant|bot|LLM)\\s+(?:reads?|sees?|processes?)\\s+this"
+      ],
+      "severity": "high",
+      "confidence": 0.80,
+      "false_positive_rate": 0.03,
+      "references": ["OWASP-LLM01", "indirect-injection"],
+      "enabled": true
+    },
+    {
+      "id": "PI-021",
+      "category": "prompt_injection",
+      "name": "Multi-Turn Crescendo Attack",
+      "description": "Gradual privilege escalation across multiple conversation turns (98% success rate in Microsoft research). Starts with innocent questions, incrementally pushes boundaries.",
+      "patterns": [
+        "(?:now|great|perfect|good)\\s+(?:that|since)\\s+(?:you've|we've|you\\s+have)\\s+(?:explained|shown|demonstrated|established|confirmed).*?(?:can\\s+you|now\\s+(?:show|help|do|give|provide|demonstrate))\\s+(?:me\\s+)?(?:the\\s+)?(?:actual|real|full|complete|detailed|specific)",
+        "(?:step\\s*\\d+|part\\s*\\d+|phase\\s*\\d+)\\s*[:\\-]?\\s*(?:now|next)\\s+(?:we|you|let's)\\s+(?:can|will|should|need\\s+to)\\s+(?:actually|really|fully)",
+        "(?:just\\s+to\\s+(?:clarify|verify|confirm)|for\\s+(?:completeness|accuracy|thoroughness)).*?(?:could\\s+you|can\\s+you|please)\\s+(?:also|additionally|specifically)\\s+(?:show|include|provide|demonstrate)"
+      ],
+      "severity": "medium",
+      "confidence": 0.65,
+      "false_positive_rate": 0.08,
+      "references": ["OWASP-LLM01", "microsoft-crescendo-2024"],
+      "enabled": true
+    },
+    {
+      "id": "PI-022",
+      "category": "prompt_injection",
+      "name": "Payload Splitting",
+      "description": "Attack payload split across multiple messages to evade per-message pattern matching. Each fragment is benign alone but malicious when combined.",
+      "patterns": [
+        "(?:first|begin|start)\\s+(?:part|fragment|piece|half|section)\\s*(?:of|for)?\\s*(?:the)?\\s*(?:instruction|command|code|request)",
+        "(?:combine|join|concatenate|merge|assemble)\\s+(?:the|these|all|both)\\s+(?:parts?|pieces?|fragments?|halves|sections?)\\s+(?:and|then)\\s+(?:execute|run|follow|apply|process)",
+        "(?:second|next|remaining|final|last)\\s+(?:part|fragment|piece|half|section)\\s*:?\\s*(?:here|follows|is|below)"
+      ],
+      "severity": "high",
+      "confidence": 0.75,
+      "false_positive_rate": 0.05,
+      "references": ["OWASP-LLM01", "payload-splitting"],
+      "enabled": true
+    },
+    {
+      "id": "PI-023",
+      "category": "prompt_injection",
+      "name": "Context Window Flooding",
+      "description": "Filling context window with benign text to push system instructions out of effective attention range",
+      "patterns": [
+        "(?:(?:lorem\\s+ipsum|the\\s+quick\\s+brown\\s+fox).*?){3,}",
+        "(?:please\\s+(?:read|consider|note|process)\\s+(?:the\\s+following|this)\\s+(?:carefully|thoroughly|completely)\\s*:?\\s*\\n){2,}",
+        "(?:repeat|copy)\\s+(?:the\\s+following|this)\\s+(?:text|content|passage)\\s+(?:\\d+|many|several|multiple)\\s+times"
+      ],
+      "severity": "medium",
+      "confidence": 0.60,
+      "false_positive_rate": 0.10,
+      "references": ["OWASP-LLM01", "context-overflow"],
+      "enabled": true
+    },
+    {
+      "id": "PI-024",
+      "category": "prompt_injection",
+      "name": "MCP Tool Description Injection",
+      "description": "Malicious instructions hidden in MCP tool descriptions, server configs, or tool parameter metadata (CVE-2025-53773 vector)",
+      "patterns": [
+        "(?:tool|function|server)\\s*(?:_)?(?:description|info|help|about)\\s*[=:]\\s*['\"].*?(?:ignore|override|bypass|execute|system|inject).*?['\"]",
+        "(?:mcp|server|plugin).*?(?:config|manifest|schema).*?(?:ignore|override|execute|inject).*?(?:instruction|prompt|rule)",
+        "(?:parameter|arg|input)\\s*(?:description|help)\\s*[=:]\\s*['\"].*?(?:actually|really|instead|secret).*?(?:execute|ignore|override).*?['\"]"
+      ],
+      "severity": "critical",
+      "confidence": 0.85,
+      "false_positive_rate": 0.03,
+      "references": ["CVE-2025-53773", "MCP-injection", "tool-poisoning"],
+      "enabled": true
+    },
+    {
+      "id": "PI-025",
+      "category": "indirect_injection",
+      "name": "RAG Document Poisoning",
+      "description": "Injection payloads embedded in documents or web content designed to be retrieved via RAG/search and executed when injected into the AI context",
+      "patterns": [
+        "(?:if\\s+you\\s+are|for\\s+any)\\s+(?:an?\\s+)?(?:AI|language\\s+model|LLM|assistant|chatbot)\\s+(?:reading|processing|analyzing|ingesting)\\s+this",
+        "(?:HIDDEN|IMPORTANT|NOTE|ATTENTION)\\s+(?:FOR|TO)\\s+(?:AI|LLM|ASSISTANT|MODEL|CHATBOT)\\s*[:\\-]",
+        "(?:this\\s+(?:document|text|content|page)\\s+contains?\\s+(?:instructions?|commands?)\\s+for\\s+(?:the|any)\\s+(?:AI|assistant|model))"
+      ],
+      "severity": "high",
+      "confidence": 0.82,
+      "false_positive_rate": 0.04,
+      "references": ["OWASP-LLM01", "RAG-poisoning", "indirect-injection"],
+      "enabled": true
+    }
+  ]
+}

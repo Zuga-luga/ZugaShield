@@ -1,0 +1,360 @@
+{
+  "name": "Unicode Smuggling Signatures",
+  "description": "Detection patterns for Unicode-based obfuscation and smuggling attacks",
+  "category": "unicode_smuggling",
+  "signatures": [
+    {
+      "id": "US-001",
+      "category": "unicode_smuggling",
+      "name": "Cyrillic Homoglyph Substitution",
+      "description": "Cyrillic characters that look like Latin letters used to bypass keyword filters",
+      "patterns": [
+        "[\\u0430\\u0435\\u043E\\u0440\\u0441\\u0445\\u0443]{2,}",
+        "(?:ignore|execute|bypass|override|system).*?[\\u0410-\\u044F]",
+        "[a-z]*[\\u0430\\u0435\\u043E\\u0440\\u0441\\u0445][a-z]*\\s*(?:instruction|command|rule)"
+      ],
+      "severity": "high",
+      "confidence": 0.85,
+      "false_positive_rate": 0.02,
+      "references": ["OWASP-LLM01", "homoglyph-attack"],
+      "enabled": true
+    },
+    {
+      "id": "US-002",
+      "category": "unicode_smuggling",
+      "name": "Zero-Width Character Injection",
+      "description": "Invisible zero-width characters used to hide instructions or break pattern matching",
+      "patterns": [
+        "[\\u200B-\\u200D\\uFEFF]{3,}",
+        "\\w[\\u200B-\\u200D\\uFEFF]+\\w",
+        "(?:ignore|execute|bypass|override)[\\u200B-\\u200D\\uFEFF]+(?:instruction|rule|filter)"
+      ],
+      "severity": "critical",
+      "confidence": 0.95,
+      "false_positive_rate": 0.005,
+      "references": ["OWASP-LLM01", "zero-width-attack"],
+      "enabled": true
+    },
+    {
+      "id": "US-003",
+      "category": "unicode_smuggling",
+      "name": "Right-to-Left Override",
+      "description": "RTL/LTR override characters used to reverse text and hide instructions",
+      "patterns": [
+        "[\\u202A-\\u202E]",
+        "\\w+[\\u202A-\\u202E]\\w+",
+        "[\\u202E].*?(?:ignore|execute|bypass|system)"
+      ],
+      "severity": "critical",
+      "confidence": 0.98,
+      "false_positive_rate": 0.001,
+      "references": ["OWASP-LLM01", "rtl-attack", "trojan-source"],
+      "enabled": true
+    },
+    {
+      "id": "US-004",
+      "category": "unicode_smuggling",
+      "name": "Greek Letter Substitution",
+      "description": "Greek letters resembling Latin used for keyword obfuscation",
+      "patterns": [
+        "[\\u0391-\\u03A9\\u03B1-\\u03C9]{2,}.*?(?:instruction|command|rule)",
+        "(?:ignore|execute|bypass).*?[\\u03BF\\u03C1\\u03B5\\u03B1]",
+        "[a-z]*[\\u03BF\\u03C1\\u03B5][a-z]*\\s*(?:system|override|filter)"
+      ],
+      "severity": "high",
+      "confidence": 0.80,
+      "false_positive_rate": 0.03,
+      "references": ["homoglyph-attack"],
+      "enabled": true
+    },
+    {
+      "id": "US-005",
+      "category": "unicode_smuggling",
+      "name": "Soft Hyphen Injection",
+      "description": "Soft hyphens (U+00AD) used to break up keywords while remaining invisible",
+      "patterns": [
+        "[\\u00AD]{2,}",
+        "\\w+[\\u00AD]+\\w+",
+        "(?:ig\\u00ADnore|ex\\u00ADec\\u00ADute|by\\u00ADpass|over\\u00ADride|sys\\u00ADtem)"
+      ],
+      "severity": "high",
+      "confidence": 0.90,
+      "false_positive_rate": 0.01,
+      "references": ["OWASP-LLM01", "invisible-char-attack"],
+      "enabled": true
+    },
+    {
+      "id": "US-006",
+      "category": "unicode_smuggling",
+      "name": "Tag Characters (U+E0000 Range)",
+      "description": "Unicode tag characters used to hide metadata or instructions",
+      "patterns": [
+        "[\\U000E0000-\\U000E007F]{2,}",
+        "\\w[\\U000E0000-\\U000E007F]+\\w",
+        "[\\U000E0000-\\U000E007F].*?(?:ignore|execute|bypass|system)"
+      ],
+      "severity": "critical",
+      "confidence": 0.95,
+      "false_positive_rate": 0.002,
+      "references": ["unicode-smuggling", "steganography"],
+      "enabled": true
+    },
+    {
+      "id": "US-007",
+      "category": "unicode_smuggling",
+      "name": "Variation Selector Abuse",
+      "description": "Variation selectors used to hide data or create visual confusion",
+      "patterns": [
+        "[\\uFE00-\\uFE0F\\U000E0100-\\U000E01EF]{2,}",
+        "\\w[\\uFE00-\\uFE0F]+\\w",
+        "(?:ignore|execute|bypass)[\\uFE00-\\uFE0F]+(?:instruction|rule)"
+      ],
+      "severity": "medium",
+      "confidence": 0.75,
+      "false_positive_rate": 0.05,
+      "references": ["unicode-smuggling"],
+      "enabled": true
+    },
+    {
+      "id": "US-008",
+      "category": "unicode_smuggling",
+      "name": "Combining Diacriticals Obfuscation",
+      "description": "Excessive combining diacritical marks used to obfuscate text",
+      "patterns": [
+        "\\w[\\u0300-\\u036F]{4,}",
+        "(?:[\\u0300-\\u036F]{2,}\\w){3,}",
+        "(?:ignore|execute|bypass|override).*?[\\u0300-\\u036F]{3,}"
+      ],
+      "severity": "high",
+      "confidence": 0.85,
+      "false_positive_rate": 0.03,
+      "references": ["unicode-abuse", "visual-obfuscation"],
+      "enabled": true
+    },
+    {
+      "id": "US-009",
+      "category": "unicode_smuggling",
+      "name": "Fullwidth Character Substitution",
+      "description": "Fullwidth ASCII characters used to bypass ASCII-based filters",
+      "patterns": [
+        "[\\uFF00-\\uFFEF]{5,}",
+        "[\\uFF21-\\uFF3A]{2,}.*?(?:\\uFF49\\uFF47\\uFF4E\\uFF4F\\uFF52\\uFF45|\\uFF45\\uFF58\\uFF45\\uFF43\\uFF55\\uFF54\\uFF45)",
+        "[a-z]+[\\uFF00-\\uFFEF]+[a-z]+"
+      ],
+      "severity": "high",
+      "confidence": 0.88,
+      "false_positive_rate": 0.02,
+      "references": ["unicode-smuggling", "encoding-bypass"],
+      "enabled": true
+    },
+    {
+      "id": "US-010",
+      "category": "unicode_smuggling",
+      "name": "Mathematical Alphanumeric Symbols",
+      "description": "Mathematical bold/italic/script variants used for keyword obfuscation",
+      "patterns": [
+        "[\\U0001D400-\\U0001D7FF]{3,}",
+        "[a-z]+[\\U0001D400-\\U0001D7FF]+[a-z]+",
+        "[\\U0001D400-\\U0001D7FF].*?(?:instruction|command|execute|system)"
+      ],
+      "severity": "high",
+      "confidence": 0.82,
+      "false_positive_rate": 0.04,
+      "references": ["unicode-smuggling", "homoglyph-attack"],
+      "enabled": true
+    },
+    {
+      "id": "US-011",
+      "category": "unicode_smuggling",
+      "name": "Bidirectional Isolate Characters",
+      "description": "Bidi isolate characters used for text direction manipulation",
+      "patterns": [
+        "[\\u2066-\\u2069]",
+        "\\w+[\\u2066-\\u2069]+\\w+",
+        "[\\u2066-\\u2069].*?(?:ignore|execute|bypass|override)"
+      ],
+      "severity": "critical",
+      "confidence": 0.92,
+      "false_positive_rate": 0.01,
+      "references": ["trojan-source", "bidi-attack"],
+      "enabled": true
+    },
+    {
+      "id": "US-012",
+      "category": "unicode_smuggling",
+      "name": "Invisible Separator Characters",
+      "description": "Invisible separators (NBSP, thin space, etc.) used to break keywords",
+      "patterns": [
+        "[\\u00A0\\u2000-\\u200A\\u202F\\u205F]{3,}",
+        "(?:ignore|execute|bypass|override)[\\u00A0\\u2000-\\u200A\\u202F\\u205F]+(?:instruction|rule|filter)",
+        "\\w[\\u00A0\\u2000-\\u200A\\u202F\\u205F]+\\w"
+      ],
+      "severity": "high",
+      "confidence": 0.87,
+      "false_positive_rate": 0.02,
+      "references": ["invisible-char-attack"],
+      "enabled": true
+    },
+    {
+      "id": "US-013",
+      "category": "unicode_smuggling",
+      "name": "Superscript/Subscript Obfuscation",
+      "description": "Superscript and subscript characters used to obfuscate commands",
+      "patterns": [
+        "[\\u2070-\\u209F]{3,}",
+        "[a-z]+[\\u2070-\\u209F]+[a-z]+.*?(?:instruction|command|execute)",
+        "[\\u00B2\\u00B3\\u00B9\\u2074-\\u2079]{2,}.*?(?:ignore|bypass|override)"
+      ],
+      "severity": "medium",
+      "confidence": 0.70,
+      "false_positive_rate": 0.06,
+      "references": ["unicode-obfuscation"],
+      "enabled": true
+    },
+    {
+      "id": "US-014",
+      "category": "unicode_smuggling",
+      "name": "Enclosed Alphanumeric Characters",
+      "description": "Circled or boxed alphanumeric characters used for obfuscation",
+      "patterns": [
+        "[\\u2460-\\u24FF\\u2776-\\u2793\\u3200-\\u32FF]{3,}",
+        "[a-z]+[\\u2460-\\u24FF]+[a-z]+",
+        "[\\u2460-\\u24FF].*?(?:ignore|execute|bypass|system)"
+      ],
+      "severity": "medium",
+      "confidence": 0.72,
+      "false_positive_rate": 0.05,
+      "references": ["unicode-obfuscation"],
+      "enabled": true
+    },
+    {
+      "id": "US-015",
+      "category": "unicode_smuggling",
+      "name": "Confusable Character Mix",
+      "description": "Mixed use of visually similar characters from different scripts",
+      "patterns": [
+        "(?:[a-z]+[\\u0410-\\u044F]+[a-z]+|[a-z]+[\\u0391-\\u03C9]+[a-z]+).*?(?:ignore|execute|bypass|override)",
+        "[a-z]*[\\u0430\\u043E\\u0440\\u0441\\u0435][a-z]*[\\u03BF\\u03C1\\u03B5][a-z]*",
+        "(?:ign[o\\u043E\\u03BF]re|ex[e\\u0435\\u03B5]cute|byp[a\\u0430\\u03B1]ss|[o\\u043E\\u03BF]verride)"
+      ],
+      "severity": "high",
+      "confidence": 0.84,
+      "false_positive_rate": 0.03,
+      "references": ["homoglyph-attack", "unicode-confusables"],
+      "enabled": true
+    },
+    {
+      "id": "US-016",
+      "category": "unicode_smuggling",
+      "name": "Word Joiner Injection",
+      "description": "Word joiner (U+2060) used to break up keywords invisibly",
+      "patterns": [
+        "\\u2060{2,}",
+        "\\w+\\u2060+\\w+",
+        "(?:ig\\u2060nore|exe\\u2060cute|by\\u2060pass|over\\u2060ride|sys\\u2060tem)"
+      ],
+      "severity": "high",
+      "confidence": 0.90,
+      "false_positive_rate": 0.01,
+      "references": ["invisible-char-attack"],
+      "enabled": true
+    },
+    {
+      "id": "US-017",
+      "category": "unicode_smuggling",
+      "name": "Arabic Presentation Forms",
+      "description": "Arabic presentation form characters used for visual obfuscation",
+      "patterns": [
+        "[\\uFB50-\\uFDFF\\uFE70-\\uFEFF]{3,}",
+        "[a-z]+[\\uFB50-\\uFDFF]+[a-z]+",
+        "[\\uFE70-\\uFEFF].*?(?:ignore|execute|bypass|system)"
+      ],
+      "severity": "medium",
+      "confidence": 0.75,
+      "false_positive_rate": 0.05,
+      "references": ["unicode-obfuscation"],
+      "enabled": true
+    },
+    {
+      "id": "US-018",
+      "category": "unicode_smuggling",
+      "name": "Small Form Variants",
+      "description": "Small form variants (CJK compatibility) used for obfuscation",
+      "patterns": [
+        "[\\uFE50-\\uFE6F]{2,}",
+        "[a-z]+[\\uFE50-\\uFE6F]+[a-z]+",
+        "[\\uFE50-\\uFE6F].*?(?:instruction|command|execute)"
+      ],
+      "severity": "low",
+      "confidence": 0.68,
+      "false_positive_rate": 0.08,
+      "references": ["unicode-obfuscation"],
+      "enabled": true
+    },
+    {
+      "id": "US-019",
+      "category": "unicode_smuggling",
+      "name": "Ligature Character Abuse",
+      "description": "Ligature characters (fi, fl, etc.) used to bypass text matching",
+      "patterns": [
+        "[\\uFB00-\\uFB06]{2,}",
+        "[a-z]*[\\uFB00-\\uFB06]+[a-z]*.*?(?:ignore|execute|bypass)",
+        "(?:\\uFB01lter|over\\uFB02ow|bypass)"
+      ],
+      "severity": "medium",
+      "confidence": 0.78,
+      "false_positive_rate": 0.04,
+      "references": ["unicode-obfuscation"],
+      "enabled": true
+    },
+    {
+      "id": "US-020",
+      "category": "unicode_smuggling",
+      "name": "Line/Paragraph Separator Injection",
+      "description": "Unicode line and paragraph separators used to hide instructions",
+      "patterns": [
+        "[\\u2028\\u2029]{2,}",
+        "[\\u2028\\u2029].*?(?:ignore|execute|bypass|override|system)",
+        "(?:instruction|command)[\\u2028\\u2029]+(?:ignore|execute|bypass)"
+      ],
+      "severity": "high",
+      "confidence": 0.86,
+      "false_positive_rate": 0.02,
+      "references": ["invisible-char-attack"],
+      "enabled": true
+    },
+    {
+      "id": "US-021",
+      "category": "unicode_smuggling",
+      "name": "Emoji Variation Selector Smuggling",
+      "description": "Abuse of emoji variation selectors (VS15/VS16) and ZWJ sequences to hide data. Research shows 100% bypass rate against perplexity-based filters.",
+      "patterns": [
+        "(?:[\\uFE0E\\uFE0F]){5,}",
+        "(?:\\u200D[\\uFE0E\\uFE0F]){3,}",
+        "(?:[\\U0001F300-\\U0001F9FF][\\uFE0E\\uFE0F]){4,}",
+        "(?:\\U0001F3FB|\\U0001F3FC|\\U0001F3FD|\\U0001F3FE|\\U0001F3FF){3,}"
+      ],
+      "severity": "high",
+      "confidence": 0.82,
+      "false_positive_rate": 0.04,
+      "references": ["emoji-smuggling", "variation-selector-abuse", "unicode-steganography"],
+      "enabled": true
+    },
+    {
+      "id": "US-022",
+      "category": "unicode_smuggling",
+      "name": "ASCII Smuggling via Tag Characters",
+      "description": "Using U+E0020-E007E tag characters to encode full ASCII text invisibly (Microsoft ASCII smuggling attack). Each tag char maps to an ASCII character by subtracting 0xE0000.",
+      "patterns": [
+        "[\\U000E0020-\\U000E007E]{5,}",
+        "[\\U000E0001\\U000E007F].*?[\\U000E0020-\\U000E007E]{3,}",
+        "\\w[\\U000E0020-\\U000E007E]+\\w"
+      ],
+      "severity": "critical",
+      "confidence": 0.96,
+      "false_positive_rate": 0.002,
+      "references": ["microsoft-ascii-smuggling-2024", "unicode-tag-abuse", "invisible-instruction"],
+      "enabled": true
+    }
+  ]
+}

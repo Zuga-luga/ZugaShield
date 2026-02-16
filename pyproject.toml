@@ -1,0 +1,71 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "zugashield"
+version = "1.0.0"
+description = "AI Agent Security System - 7-layer defense against prompt injection, data exfiltration, and AI-specific attacks"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [
+    {name = "Antonio Zuga", email = "antonio@zuga.dev"},
+]
+keywords = [
+    "ai-security", "prompt-injection", "llm-security", "mcp",
+    "data-loss-prevention", "ai-agent", "red-team", "defense",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = []
+
+[project.optional-dependencies]
+fastapi = ["fastapi>=0.100.0", "uvicorn>=0.20.0"]
+multimodal = ["Pillow>=9.0.0"]
+llm-judge = ["anthropic>=0.30.0"]
+mcp = ["mcp>=1.0.0"]
+all = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+    "Pillow>=9.0.0",
+    "anthropic>=0.30.0",
+    "mcp>=1.0.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/zugadev/zugashield"
+Documentation = "https://github.com/zugadev/zugashield#readme"
+Repository = "https://github.com/zugadev/zugashield"
+Issues = "https://github.com/zugadev/zugashield/issues"
+
+[project.scripts]
+zugashield-mcp = "zugashield_mcp.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["zugashield", "zugashield_mcp"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"

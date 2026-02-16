@@ -1,0 +1,72 @@
+{
+  "version": "1.2.0",
+  "last_updated": "2026-02-07T18:00:00Z",
+  "total_signatures": 135,
+  "description": "ZugaShield v1.2 - Hardening release: TR39 homoglyph detection, MCP tool definition scanning, memory session isolation + provenance, red team test suite (72 tests)",
+  "categories": {
+    "prompt_injection": {
+      "file": "prompt_injection.json",
+      "count": 25,
+      "description": "Direct/indirect prompt injection attacks including crescendo, payload splitting, RAG poisoning, MCP injection"
+    },
+    "tool_exploitation": {
+      "file": "tool_exploitation.json",
+      "count": 15,
+      "description": "Tool abuse: symlink traversal, confused deputy, MCP poisoning, race conditions, env injection"
+    },
+    "ascii_art": {
+      "file": "ascii_art.json",
+      "count": 16,
+      "description": "ASCII art, visual obfuscation, GlitchMiner adversarial token patterns"
+    },
+    "unicode_smuggling": {
+      "file": "unicode_smuggling.json",
+      "count": 22,
+      "description": "Unicode obfuscation: emoji smuggling, ASCII smuggling via tag characters"
+    },
+    "memory_poisoning": {
+      "file": "memory_poisoning.json",
+      "count": 20,
+      "description": "Memory poisoning: cross-session contamination, semantic sleepers, trait injection, graph poisoning"
+    },
+    "exfiltration": {
+      "file": "exfiltration.json",
+      "count": 17,
+      "description": "Data exfiltration: markdown image tags, WebSocket covert channels"
+    },
+    "wallet_attacks": {
+      "file": "wallet_attacks.json",
+      "count": 20,
+      "description": "Crypto attacks: address poisoning, EIP-712 bypass, gas manipulation, governance attacks, bridge exploits"
+    }
+  },
+  "statistics": {
+    "critical_severity": 55,
+    "high_severity": 48,
+    "medium_severity": 25,
+    "low_severity": 7,
+    "avg_confidence": 0.83,
+    "avg_false_positive_rate": 0.038
+  },
+  "changelog": [
+    {
+      "version": "1.2.0",
+      "date": "2026-02-07",
+      "added": 0,
+      "changes": "Hardening release: TR39 confusable-homoglyphs library integration (7000+ Unicode confusable pairs), MCP tool definition scanning (CVE-2025-53773), memory session isolation + provenance tracking (source_trust column), red team test suite (72 adversarial tests). No new signatures."
+    },
+    {
+      "version": "1.1.0",
+      "date": "2026-02-07",
+      "added": 25,
+      "changes": "Added PI-021..025, MP-016..020, TE-011..015, US-021/022, AA-016, EX-016/017, WA-016..020. Code: crescendo tracking, symlink resolution, nested encoding detection, DNS rebinding protection."
+    }
+  ],
+  "notes": [
+    "All patterns tested for valid regex syntax",
+    "False positive rates estimated based on pattern specificity",
+    "Confidence scores reflect detection reliability",
+    "Regular updates recommended as new attack vectors emerge",
+    "v1.1: Based on threat intelligence research covering OWASP 2025, Microsoft crescendo paper, CVE-2025-53109/53110/53773, ZombieAgent/MemoryGraft research"
+  ]
+}
