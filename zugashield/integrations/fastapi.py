@@ -19,6 +19,7 @@ from typing import Callable, Optional
 
 try:
     from fastapi import APIRouter, Query
+
     _HAS_FASTAPI = True
 except ImportError:
     _HAS_FASTAPI = False
@@ -39,10 +40,7 @@ def create_shield_router(
         FastAPI APIRouter with shield endpoints
     """
     if not _HAS_FASTAPI:
-        raise ImportError(
-            "FastAPI is required for the shield dashboard. "
-            "Install with: pip install zugashield[fastapi]"
-        )
+        raise ImportError("FastAPI is required for the shield dashboard. Install with: pip install zugashield[fastapi]")
 
     router = APIRouter(prefix=prefix, tags=["ZugaShield"])
 

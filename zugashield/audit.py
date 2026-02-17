@@ -129,8 +129,10 @@ class ShieldAuditLogger:
             if decision.is_blocked:
                 logger.warning(
                     "[ShieldAudit] BLOCKED by %s: %s (threats=%d, %.1fms)",
-                    layer, decision.threats_detected[0].description if decision.threats_detected else "unknown",
-                    decision.threat_count, decision.elapsed_ms,
+                    layer,
+                    decision.threats_detected[0].description if decision.threats_detected else "unknown",
+                    decision.threat_count,
+                    decision.elapsed_ms,
                 )
 
     def get_recent(self, limit: int = 100, layer: Optional[str] = None) -> List[Dict]:

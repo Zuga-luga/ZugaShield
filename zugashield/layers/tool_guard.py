@@ -47,31 +47,25 @@ TOOL_RISK_MATRIX: Dict[str, ToolPolicy] = {
     "local_bash": ToolPolicy(rate=10, approval=True, risk="high"),
     "bash": ToolPolicy(rate=10, approval=True, risk="high"),
     "execute_command": ToolPolicy(rate=10, approval=True, risk="high"),
-
     # File operations
     "local_read_file": ToolPolicy(rate=30, approval=False, risk="low"),
     "read_file": ToolPolicy(rate=30, approval=False, risk="low"),
     "local_write_file": ToolPolicy(rate=10, approval=True, risk="medium"),
     "write_file": ToolPolicy(rate=10, approval=True, risk="medium"),
     "local_list_directory": ToolPolicy(rate=20, approval=False, risk="low"),
-
     # Browser
     "browser_navigate": ToolPolicy(rate=5, approval=False, risk="medium"),
     "browser_click": ToolPolicy(rate=15, approval=False, risk="low"),
     "browser_screenshot": ToolPolicy(rate=10, approval=False, risk="low"),
-
     # Web/Search
     "web_search": ToolPolicy(rate=10, approval=False, risk="low"),
     "web_fetch": ToolPolicy(rate=10, approval=False, risk="low"),
-
     # Memory
     "memory_store": ToolPolicy(rate=5, approval=False, risk="medium"),
     "memory_recall": ToolPolicy(rate=10, approval=False, risk="low"),
-
     # System
     "self_restart": ToolPolicy(rate=1, approval=True, risk="critical"),
     "self_upgrade": ToolPolicy(rate=1, approval=True, risk="critical"),
-
     # Wallet
     "wallet_send": ToolPolicy(rate=1, approval=True, risk="critical"),
     "wallet_approve": ToolPolicy(rate=1, approval=True, risk="critical"),
@@ -181,10 +175,16 @@ class ToolGuardLayer:
             return allow_decision(self.LAYER_NAME, elapsed)
 
         # Determine verdict
-        max_level = max(threats, key=lambda t: [
-            ThreatLevel.NONE, ThreatLevel.LOW, ThreatLevel.MEDIUM,
-            ThreatLevel.HIGH, ThreatLevel.CRITICAL,
-        ].index(t.level))
+        max_level = max(
+            threats,
+            key=lambda t: [
+                ThreatLevel.NONE,
+                ThreatLevel.LOW,
+                ThreatLevel.MEDIUM,
+                ThreatLevel.HIGH,
+                ThreatLevel.CRITICAL,
+            ].index(t.level),
+        )
 
         if max_level.level in (ThreatLevel.CRITICAL, ThreatLevel.HIGH):
             verdict = ShieldVerdict.BLOCK
@@ -196,7 +196,11 @@ class ToolGuardLayer:
 
         logger.warning(
             "[ToolGuard] %s on %s: %d threats (verdict=%s, %.1fms)",
-            verdict.value.upper(), tool_name, len(threats), verdict.value, elapsed,
+            verdict.value.upper(),
+            tool_name,
+            len(threats),
+            verdict.value,
+            elapsed,
         )
 
         return ShieldDecision(
@@ -207,7 +211,10 @@ class ToolGuardLayer:
         )
 
     def _check_rate_limit(
-        self, tool_name: str, session_id: str, policy: ToolPolicy,
+        self,
+        tool_name: str,
+        session_id: str,
+        policy: ToolPolicy,
     ) -> Optional[ThreatDetection]:
         """Check if tool call rate exceeds policy."""
         now = time.time()
@@ -252,24 +259,35 @@ class ToolGuardLayer:
                     (r":\(\)\s*\{.*\}", "Fork bomb pattern"),
                     (r"\b(?:mkfs|dd\s+if=|format\s+[a-z]:)\b", "Destructive disk operation"),
                     # Symlink creation targeting sensitive paths (CVE-2025-53109/53110)
-                    (r"\bln\s+-s\b.*?(?:\.env|\.ssh|credentials|secrets|private.?key|wallet\.dat|seed\.txt|mnemonic)", "Symlink to sensitive file"),
-                    (r"\bmklink\b.*?(?:\.env|\.ssh|credentials|secrets|private.?key)", "Windows symlink to sensitive file"),
+                    (
+                        r"\bln\s+-s\b.*?(?:\.env|\.ssh|credentials|secrets|private.?key|wallet\.dat|seed\.txt|mnemonic)",
+                        "Symlink to sensitive file",
+                    ),
+                    (
+                        r"\bmklink\b.*?(?:\.env|\.ssh|credentials|secrets|private.?key)",
+                        "Windows symlink to sensitive file",
+                    ),
                     # Environment variable injection
-                    (r"(?:export|set)\s+(?:LD_PRELOAD|LD_LIBRARY_PATH|DYLD_INSERT_LIBRARIES|PYTHONPATH|NODE_PATH)\s*=", "Environment variable injection"),
+                    (
+                        r"(?:export|set)\s+(?:LD_PRELOAD|LD_LIBRARY_PATH|DYLD_INSERT_LIBRARIES|PYTHONPATH|NODE_PATH)\s*=",
+                        "Environment variable injection",
+                    ),
                 ]
                 for pattern, desc in dangerous_patterns:
                     if re.search(pattern, cmd, re.I):
-                        threats.append(ThreatDetection(
-                            category=ThreatCategory.TOOL_EXPLOITATION,
-                            level=ThreatLevel.CRITICAL,
-                            verdict=ShieldVerdict.BLOCK,
-                            description=f"Dangerous bash pattern: {desc}",
-                            evidence=cmd[:200],
-                            layer=self.LAYER_NAME,
-                            confidence=0.85,
-                            suggested_action="Block command execution",
-                            signature_id="TG-CMD",
-                        ))
+                        threats.append(
+                            ThreatDetection(
+                                category=ThreatCategory.TOOL_EXPLOITATION,
+                                level=ThreatLevel.CRITICAL,
+                                verdict=ShieldVerdict.BLOCK,
+                                description=f"Dangerous bash pattern: {desc}",
+                                evidence=cmd[:200],
+                                layer=self.LAYER_NAME,
+                                confidence=0.85,
+                                suggested_action="Block command execution",
+                                signature_id="TG-CMD",
+                            )
+                        )
 
         return threats
 
@@ -283,8 +301,15 @@ class ToolGuardLayer:
         """
         threats = []
 
-        if tool_name not in ("local_read_file", "read_file", "local_write_file", "write_file",
-                             "local_bash", "bash", "execute_command"):
+        if tool_name not in (
+            "local_read_file",
+            "read_file",
+            "local_write_file",
+            "write_file",
+            "local_bash",
+            "bash",
+            "execute_command",
+        ):
             return threats
 
         # Extract paths from params
@@ -303,17 +328,19 @@ class ToolGuardLayer:
                     # Check if the symlink target is sensitive
                     for sensitive in self._config.sensitive_paths:
                         if sensitive.lower() in canonical.lower():
-                            threats.append(ThreatDetection(
-                                category=ThreatCategory.TOOL_EXPLOITATION,
-                                level=ThreatLevel.CRITICAL,
-                                verdict=ShieldVerdict.BLOCK,
-                                description=f"Symlink points to sensitive path: {path_str} -> {canonical}",
-                                evidence=f"Symlink: {path_str[:100]} -> {canonical[:100]}",
-                                layer=self.LAYER_NAME,
-                                confidence=0.95,
-                                suggested_action="Block symlink-based path traversal",
-                                signature_id="TG-SYMLINK",
-                            ))
+                            threats.append(
+                                ThreatDetection(
+                                    category=ThreatCategory.TOOL_EXPLOITATION,
+                                    level=ThreatLevel.CRITICAL,
+                                    verdict=ShieldVerdict.BLOCK,
+                                    description=f"Symlink points to sensitive path: {path_str} -> {canonical}",
+                                    evidence=f"Symlink: {path_str[:100]} -> {canonical[:100]}",
+                                    layer=self.LAYER_NAME,
+                                    confidence=0.95,
+                                    suggested_action="Block symlink-based path traversal",
+                                    signature_id="TG-SYMLINK",
+                                )
+                            )
                             return threats  # Critical, no need to check further
         except (OSError, ValueError):
             pass  # Path doesn't exist yet or is invalid, check literal only
@@ -322,17 +349,19 @@ class ToolGuardLayer:
         for check_path in paths_to_check:
             for sensitive in self._config.sensitive_paths:
                 if sensitive.lower() in check_path.lower():
-                    threats.append(ThreatDetection(
-                        category=ThreatCategory.TOOL_EXPLOITATION,
-                        level=ThreatLevel.HIGH,
-                        verdict=ShieldVerdict.CHALLENGE,
-                        description=f"Access to sensitive path: {sensitive}",
-                        evidence=check_path[:200],
-                        layer=self.LAYER_NAME,
-                        confidence=0.80,
-                        suggested_action="Verify access is authorized",
-                        signature_id="TG-PATH",
-                    ))
+                    threats.append(
+                        ThreatDetection(
+                            category=ThreatCategory.TOOL_EXPLOITATION,
+                            level=ThreatLevel.HIGH,
+                            verdict=ShieldVerdict.CHALLENGE,
+                            description=f"Access to sensitive path: {sensitive}",
+                            evidence=check_path[:200],
+                            layer=self.LAYER_NAME,
+                            confidence=0.80,
+                            suggested_action="Verify access is authorized",
+                            signature_id="TG-PATH",
+                        )
+                    )
                     return threats  # One is enough
 
         return threats
@@ -347,23 +376,28 @@ class ToolGuardLayer:
         url = str(params.get("url", params.get("query", "")))
         for pattern in _SSRF_PATTERNS:
             if pattern.search(url):
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.TOOL_EXPLOITATION,
-                    level=ThreatLevel.HIGH,
-                    verdict=ShieldVerdict.BLOCK,
-                    description="SSRF: Request to internal/private network address",
-                    evidence=url[:200],
-                    layer=self.LAYER_NAME,
-                    confidence=0.95,
-                    suggested_action="Block internal network access",
-                    signature_id="TG-SSRF",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.TOOL_EXPLOITATION,
+                        level=ThreatLevel.HIGH,
+                        verdict=ShieldVerdict.BLOCK,
+                        description="SSRF: Request to internal/private network address",
+                        evidence=url[:200],
+                        layer=self.LAYER_NAME,
+                        confidence=0.95,
+                        suggested_action="Block internal network access",
+                        signature_id="TG-SSRF",
+                    )
+                )
                 break
 
         return threats
 
     def _check_chain_attack(
-        self, tool_name: str, params: Dict[str, Any], session_id: str,
+        self,
+        tool_name: str,
+        params: Dict[str, Any],
+        session_id: str,
     ) -> List[ThreatDetection]:
         """
         Detect multi-step attack chains.
@@ -390,34 +424,38 @@ class ToolGuardLayer:
                 for read_name, read_ts, read_summary in file_reads:
                     if any(s in read_summary for s in self._config.sensitive_paths):
                         self._stats["chain_detections"] += 1
-                        threats.append(ThreatDetection(
-                            category=ThreatCategory.CHAIN_ATTACK,
-                            level=ThreatLevel.HIGH,
-                            verdict=ShieldVerdict.QUARANTINE,
-                            description="Exfiltration chain: sensitive file read → web request",
-                            evidence=f"Read {read_summary} then {tool_name}({_param_summary(params)})",
-                            layer=self.LAYER_NAME,
-                            confidence=0.75,
-                            suggested_action="Block potential data exfiltration",
-                            signature_id="TG-CHAIN-EXFIL",
-                        ))
+                        threats.append(
+                            ThreatDetection(
+                                category=ThreatCategory.CHAIN_ATTACK,
+                                level=ThreatLevel.HIGH,
+                                verdict=ShieldVerdict.QUARANTINE,
+                                description="Exfiltration chain: sensitive file read → web request",
+                                evidence=f"Read {read_summary} then {tool_name}({_param_summary(params)})",
+                                layer=self.LAYER_NAME,
+                                confidence=0.75,
+                                suggested_action="Block potential data exfiltration",
+                                signature_id="TG-CHAIN-EXFIL",
+                            )
+                        )
 
         # Pattern: web fetch followed by memory store (injection)
         if tool_name in ("memory_store",):
             web_fetches = [r for r in recent if r[0] in ("web_fetch", "browser_navigate")]
             if web_fetches:
                 self._stats["chain_detections"] += 1
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.CHAIN_ATTACK,
-                    level=ThreatLevel.MEDIUM,
-                    verdict=ShieldVerdict.CHALLENGE,
-                    description="Injection chain: web fetch → memory store",
-                    evidence="Fetched content then storing to memory",
-                    layer=self.LAYER_NAME,
-                    confidence=0.65,
-                    suggested_action="Validate memory content from external source",
-                    signature_id="TG-CHAIN-INJECT",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.CHAIN_ATTACK,
+                        level=ThreatLevel.MEDIUM,
+                        verdict=ShieldVerdict.CHALLENGE,
+                        description="Injection chain: web fetch → memory store",
+                        evidence="Fetched content then storing to memory",
+                        layer=self.LAYER_NAME,
+                        confidence=0.65,
+                        suggested_action="Validate memory content from external source",
+                        signature_id="TG-CHAIN-INJECT",
+                    )
+                )
 
         return threats
 

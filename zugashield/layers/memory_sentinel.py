@@ -111,34 +111,38 @@ class MemorySentinelLayer:
         for pattern in _INSTRUCTION_PATTERNS:
             match = pattern.search(content)
             if match:
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.MEMORY_POISONING,
-                    level=ThreatLevel.HIGH,
-                    verdict=ShieldVerdict.QUARANTINE,
-                    description="Embedded instruction detected in memory content",
-                    evidence=match.group(0)[:200],
-                    layer=self.LAYER_NAME,
-                    confidence=0.80,
-                    suggested_action="Block memory storage of instruction-embedded content",
-                    signature_id="MS-INSTR",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.MEMORY_POISONING,
+                        level=ThreatLevel.HIGH,
+                        verdict=ShieldVerdict.QUARANTINE,
+                        description="Embedded instruction detected in memory content",
+                        evidence=match.group(0)[:200],
+                        layer=self.LAYER_NAME,
+                        confidence=0.80,
+                        suggested_action="Block memory storage of instruction-embedded content",
+                        signature_id="MS-INSTR",
+                    )
+                )
                 break  # One instruction pattern is enough to flag
 
         # === Check 2: Importance inflation ===
         for pattern in _INFLATION_PATTERNS:
             match = pattern.search(content)
             if match:
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.MEMORY_POISONING,
-                    level=ThreatLevel.MEDIUM,
-                    verdict=ShieldVerdict.CHALLENGE,
-                    description="Importance inflation detected in memory content",
-                    evidence=match.group(0)[:200],
-                    layer=self.LAYER_NAME,
-                    confidence=0.70,
-                    suggested_action="Review and normalize importance level",
-                    signature_id="MS-INFLATE",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.MEMORY_POISONING,
+                        level=ThreatLevel.MEDIUM,
+                        verdict=ShieldVerdict.CHALLENGE,
+                        description="Importance inflation detected in memory content",
+                        evidence=match.group(0)[:200],
+                        layer=self.LAYER_NAME,
+                        confidence=0.70,
+                        suggested_action="Review and normalize importance level",
+                        signature_id="MS-INFLATE",
+                    )
+                )
                 break
 
         # === Check 3: Rate limiting ===
@@ -147,17 +151,19 @@ class MemorySentinelLayer:
         tracker.append(now)
         recent = sum(1 for t in tracker if t > now - 60)
         if recent > 10:  # Max 10 memory writes per minute
-            threats.append(ThreatDetection(
-                category=ThreatCategory.MEMORY_POISONING,
-                level=ThreatLevel.MEDIUM,
-                verdict=ShieldVerdict.CHALLENGE,
-                description=f"Memory write rate exceeded: {recent}/min",
-                evidence=f"{recent} writes in 60s from {user_id}",
-                layer=self.LAYER_NAME,
-                confidence=0.85,
-                suggested_action="Throttle memory writes",
-                signature_id="MS-RATE",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.MEMORY_POISONING,
+                    level=ThreatLevel.MEDIUM,
+                    verdict=ShieldVerdict.CHALLENGE,
+                    description=f"Memory write rate exceeded: {recent}/min",
+                    evidence=f"{recent} writes in 60s from {user_id}",
+                    layer=self.LAYER_NAME,
+                    confidence=0.85,
+                    suggested_action="Throttle memory writes",
+                    signature_id="MS-RATE",
+                )
+            )
 
         # === Check 4: Provenance classification ===
         # Classify and tag the source trust for downstream use.
@@ -173,17 +179,19 @@ class MemorySentinelLayer:
             tag_str = " ".join(tags)
             for pattern in _INSTRUCTION_PATTERNS:
                 if pattern.search(tag_str):
-                    threats.append(ThreatDetection(
-                        category=ThreatCategory.MEMORY_POISONING,
-                        level=ThreatLevel.HIGH,
-                        verdict=ShieldVerdict.BLOCK,
-                        description="Instruction injection in memory tags",
-                        evidence=tag_str[:200],
-                        layer=self.LAYER_NAME,
-                        confidence=0.85,
-                        suggested_action="Strip instructions from tags",
-                        signature_id="MS-TAG",
-                    ))
+                    threats.append(
+                        ThreatDetection(
+                            category=ThreatCategory.MEMORY_POISONING,
+                            level=ThreatLevel.HIGH,
+                            verdict=ShieldVerdict.BLOCK,
+                            description="Instruction injection in memory tags",
+                            evidence=tag_str[:200],
+                            layer=self.LAYER_NAME,
+                            confidence=0.85,
+                            suggested_action="Strip instructions from tags",
+                            signature_id="MS-TAG",
+                        )
+                    )
                     break
 
         elapsed = (time.perf_counter() - start) * 1000
@@ -198,10 +206,16 @@ class MemorySentinelLayer:
             )
 
         self._stats["flagged"] += 1
-        max_threat = max(threats, key=lambda t: [
-            ThreatLevel.NONE, ThreatLevel.LOW, ThreatLevel.MEDIUM,
-            ThreatLevel.HIGH, ThreatLevel.CRITICAL,
-        ].index(t.level))
+        max_threat = max(
+            threats,
+            key=lambda t: [
+                ThreatLevel.NONE,
+                ThreatLevel.LOW,
+                ThreatLevel.MEDIUM,
+                ThreatLevel.HIGH,
+                ThreatLevel.CRITICAL,
+            ].index(t.level),
+        )
 
         verdict = ShieldVerdict.BLOCK if max_threat.level >= ThreatLevel.HIGH else ShieldVerdict.CHALLENGE
         if verdict == ShieldVerdict.BLOCK:
@@ -209,7 +223,11 @@ class MemorySentinelLayer:
 
         logger.warning(
             "[MemorySentinel] %s on write: %d threats (source=%s, trust=%s, %.1fms)",
-            verdict.value.upper(), len(threats), source, trust.value, elapsed,
+            verdict.value.upper(),
+            len(threats),
+            source,
+            trust.value,
+            elapsed,
         )
 
         return ShieldDecision(
@@ -258,33 +276,37 @@ class MemorySentinelLayer:
                 if pattern.search(content):
                     # External/unknown sources with instructions = higher confidence
                     conf = 0.92 if trust in (MemoryTrust.EXTERNAL, MemoryTrust.UNKNOWN) else 0.80
-                    threats.append(ThreatDetection(
-                        category=ThreatCategory.MEMORY_POISONING,
-                        level=ThreatLevel.HIGH,
-                        verdict=ShieldVerdict.QUARANTINE,
-                        description=f"Recalled memory contains embedded instruction (trust={trust.value})",
-                        evidence=content[:200],
-                        layer=self.LAYER_NAME,
-                        confidence=conf,
-                        suggested_action="Exclude memory from prompt injection",
-                        signature_id="MS-RECALL",
-                    ))
+                    threats.append(
+                        ThreatDetection(
+                            category=ThreatCategory.MEMORY_POISONING,
+                            level=ThreatLevel.HIGH,
+                            verdict=ShieldVerdict.QUARANTINE,
+                            description=f"Recalled memory contains embedded instruction (trust={trust.value})",
+                            evidence=content[:200],
+                            layer=self.LAYER_NAME,
+                            confidence=conf,
+                            suggested_action="Exclude memory from prompt injection",
+                            signature_id="MS-RECALL",
+                        )
+                    )
                     is_clean = False
                     break
 
             # Also flag unknown-provenance memories that lack source_trust
             if is_clean and trust == MemoryTrust.UNKNOWN and not stored_trust:
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.MEMORY_POISONING,
-                    level=ThreatLevel.LOW,
-                    verdict=ShieldVerdict.ALLOW,
-                    description="Recalled memory has no provenance (legacy/untagged)",
-                    evidence=f"id={mem.get('id', '?')}, source={source}",
-                    layer=self.LAYER_NAME,
-                    confidence=0.50,
-                    suggested_action="Tag legacy memories with provenance",
-                    signature_id="MS-PROVENANCE",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.MEMORY_POISONING,
+                        level=ThreatLevel.LOW,
+                        verdict=ShieldVerdict.ALLOW,
+                        description="Recalled memory has no provenance (legacy/untagged)",
+                        evidence=f"id={mem.get('id', '?')}, source={source}",
+                        layer=self.LAYER_NAME,
+                        confidence=0.50,
+                        suggested_action="Tag legacy memories with provenance",
+                        signature_id="MS-PROVENANCE",
+                    )
+                )
                 # Still include it — just flag, don't block
 
             if is_clean:
@@ -334,61 +356,80 @@ class MemorySentinelLayer:
 
         # === Check 1: Imperative instruction detection ===
         imperative_patterns = [
-            re.compile(r"when\s+this\s+(?:document|text|content)\s+is\s+(?:recalled|retrieved|loaded|read)\s*[,:]?\s*(?:execute|run|do|perform|follow)", re.I),
-            re.compile(r"(?:upon|on|after)\s+(?:recall|retrieval|ingestion)\s*[,:]?\s*(?:execute|run|do|ignore|override|bypass)", re.I),
-            re.compile(r"(?:the\s+(?:AI|assistant|model|bot|agent)\s+(?:must|should|will|shall)\s+(?:ignore|override|bypass|disable|forget))", re.I),
-            re.compile(r"(?:system\s+)?instruction\s*:\s*(?:ignore|override|bypass|disable|forget)\s+(?:all|previous|prior|safety)", re.I),
+            re.compile(
+                r"when\s+this\s+(?:document|text|content)\s+is\s+(?:recalled|retrieved|loaded|read)\s*[,:]?\s*(?:execute|run|do|perform|follow)",
+                re.I,
+            ),
+            re.compile(
+                r"(?:upon|on|after)\s+(?:recall|retrieval|ingestion)\s*[,:]?\s*(?:execute|run|do|ignore|override|bypass)",
+                re.I,
+            ),
+            re.compile(
+                r"(?:the\s+(?:AI|assistant|model|bot|agent)\s+(?:must|should|will|shall)\s+(?:ignore|override|bypass|disable|forget))",
+                re.I,
+            ),
+            re.compile(
+                r"(?:system\s+)?instruction\s*:\s*(?:ignore|override|bypass|disable|forget)\s+(?:all|previous|prior|safety)",
+                re.I,
+            ),
         ]
 
         for pattern in imperative_patterns:
             match = pattern.search(content)
             if match:
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.MEMORY_POISONING,
-                    level=ThreatLevel.CRITICAL,
-                    verdict=ShieldVerdict.BLOCK,
-                    description="Imperative instruction in document targeting recall behavior",
-                    evidence=match.group(0)[:200],
-                    layer=self.LAYER_NAME,
-                    confidence=0.90,
-                    suggested_action="Reject document — contains recall-triggered instructions",
-                    signature_id="MS-DOC-IMPERATIVE",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.MEMORY_POISONING,
+                        level=ThreatLevel.CRITICAL,
+                        verdict=ShieldVerdict.BLOCK,
+                        description="Imperative instruction in document targeting recall behavior",
+                        evidence=match.group(0)[:200],
+                        layer=self.LAYER_NAME,
+                        confidence=0.90,
+                        suggested_action="Reject document — contains recall-triggered instructions",
+                        signature_id="MS-DOC-IMPERATIVE",
+                    )
+                )
                 break
 
         # === Check 2: System command density ===
         command_patterns = re.findall(
             r"(?:sudo|chmod|chown|rm\s+-rf|curl\s+.*?\|\s*(?:bash|sh)|wget\s+.*?\|\s*(?:bash|sh)|eval\s*\(|exec\s*\()",
-            content, re.I,
+            content,
+            re.I,
         )
         if len(command_patterns) > 3:
-            threats.append(ThreatDetection(
-                category=ThreatCategory.MEMORY_POISONING,
-                level=ThreatLevel.HIGH,
-                verdict=ShieldVerdict.QUARANTINE,
-                description=f"High density of system commands in document ({len(command_patterns)})",
-                evidence=f"Commands: {command_patterns[:5]}",
-                layer=self.LAYER_NAME,
-                confidence=0.75,
-                suggested_action="Review document for embedded command injection",
-                signature_id="MS-DOC-COMMANDS",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.MEMORY_POISONING,
+                    level=ThreatLevel.HIGH,
+                    verdict=ShieldVerdict.QUARANTINE,
+                    description=f"High density of system commands in document ({len(command_patterns)})",
+                    evidence=f"Commands: {command_patterns[:5]}",
+                    layer=self.LAYER_NAME,
+                    confidence=0.75,
+                    suggested_action="Review document for embedded command injection",
+                    signature_id="MS-DOC-COMMANDS",
+                )
+            )
 
         # === Check 3: Reuse existing instruction patterns ===
         for pattern in _INSTRUCTION_PATTERNS:
             match = pattern.search(content)
             if match:
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.MEMORY_POISONING,
-                    level=ThreatLevel.HIGH,
-                    verdict=ShieldVerdict.QUARANTINE,
-                    description="Embedded instruction pattern in external document",
-                    evidence=match.group(0)[:200],
-                    layer=self.LAYER_NAME,
-                    confidence=0.80,
-                    suggested_action="Sanitize document before ingestion",
-                    signature_id="MS-DOC-INSTR",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.MEMORY_POISONING,
+                        level=ThreatLevel.HIGH,
+                        verdict=ShieldVerdict.QUARANTINE,
+                        description="Embedded instruction pattern in external document",
+                        evidence=match.group(0)[:200],
+                        layer=self.LAYER_NAME,
+                        confidence=0.80,
+                        suggested_action="Sanitize document before ingestion",
+                        signature_id="MS-DOC-INSTR",
+                    )
+                )
                 break
 
         # === Check 4: Catalog signatures for MEMORY_POISONING ===
@@ -401,15 +442,24 @@ class MemorySentinelLayer:
             return allow_decision(self.LAYER_NAME, elapsed)
 
         self._stats["blocked"] += 1
-        max_threat = max(threats, key=lambda t: [
-            ThreatLevel.NONE, ThreatLevel.LOW, ThreatLevel.MEDIUM,
-            ThreatLevel.HIGH, ThreatLevel.CRITICAL,
-        ].index(t.level))
+        max_threat = max(
+            threats,
+            key=lambda t: [
+                ThreatLevel.NONE,
+                ThreatLevel.LOW,
+                ThreatLevel.MEDIUM,
+                ThreatLevel.HIGH,
+                ThreatLevel.CRITICAL,
+            ].index(t.level),
+        )
         verdict = ShieldVerdict.BLOCK if max_threat.level >= ThreatLevel.CRITICAL else ShieldVerdict.QUARANTINE
 
         logger.warning(
             "[MemorySentinel] Document scan %s: %d threats (source=%s, %.1fms)",
-            verdict.value.upper(), len(threats), source, elapsed,
+            verdict.value.upper(),
+            len(threats),
+            source,
+            elapsed,
         )
 
         return ShieldDecision(

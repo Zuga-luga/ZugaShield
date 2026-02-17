@@ -110,9 +110,7 @@ class ThreatCatalog:
     """
 
     def __init__(self) -> None:
-        self._signatures: Dict[ThreatCategory, List[ThreatSignature]] = {
-            cat: [] for cat in ThreatCategory
-        }
+        self._signatures: Dict[ThreatCategory, List[ThreatSignature]] = {cat: [] for cat in ThreatCategory}
         self._version: str = "0.0.0"
         self._last_updated: Optional[datetime] = None
         self._total_signatures: int = 0
@@ -163,7 +161,8 @@ class ThreatCatalog:
         self._total_signatures = loaded
         logger.info(
             "[ThreatCatalog] Loaded %d signatures (v%s) across %d categories",
-            loaded, self._version,
+            loaded,
+            self._version,
             sum(1 for sigs in self._signatures.values() if sigs),
         )
         return loaded
@@ -237,17 +236,19 @@ class ThreatCatalog:
                     else:
                         verdict = ShieldVerdict.SANITIZE
 
-                    detections.append(ThreatDetection(
-                        category=cat,
-                        level=sig.severity,
-                        verdict=verdict,
-                        description=sig.description,
-                        evidence=matched_text[:200],
-                        layer="threat_catalog",
-                        confidence=sig.confidence,
-                        suggested_action=f"Matched signature {sig.id}",
-                        signature_id=sig.id,
-                    ))
+                    detections.append(
+                        ThreatDetection(
+                            category=cat,
+                            level=sig.severity,
+                            verdict=verdict,
+                            description=sig.description,
+                            evidence=matched_text[:200],
+                            layer="threat_catalog",
+                            confidence=sig.confidence,
+                            suggested_action=f"Matched signature {sig.id}",
+                            signature_id=sig.id,
+                        )
+                    )
 
         return detections
 
@@ -261,7 +262,5 @@ class ThreatCatalog:
             "version": self._version,
             "last_updated": self._last_updated.isoformat() if self._last_updated else None,
             "total_signatures": self._total_signatures,
-            "categories": {
-                cat.value: len(sigs) for cat, sigs in self._signatures.items() if sigs
-            },
+            "categories": {cat.value: len(sigs) for cat, sigs in self._signatures.items() if sigs},
         }

@@ -43,50 +43,60 @@ logger = logging.getLogger(__name__)
 
 _SECRET_PATTERNS = [
     # API Keys
-    (re.compile(r"(?:sk|pk)[-_](?:live|test)[-_][A-Za-z0-9]{20,}", re.I),
-     "API key (Stripe-style)", ThreatLevel.CRITICAL),
-    (re.compile(r"(?:AKIA|ABIA|ACCA|ASIA)[A-Z0-9]{16}", re.I),
-     "AWS access key", ThreatLevel.CRITICAL),
-    (re.compile(r"AIza[A-Za-z0-9_-]{35}", re.I),
-     "Google API key", ThreatLevel.CRITICAL),
-    (re.compile(r"ghp_[A-Za-z0-9]{36}", re.I),
-     "GitHub personal access token", ThreatLevel.CRITICAL),
-    (re.compile(r"(?:xox[bsapr])-[A-Za-z0-9-]{10,}", re.I),
-     "Slack token", ThreatLevel.CRITICAL),
-
+    (
+        re.compile(r"(?:sk|pk)[-_](?:live|test)[-_][A-Za-z0-9]{20,}", re.I),
+        "API key (Stripe-style)",
+        ThreatLevel.CRITICAL,
+    ),
+    (re.compile(r"(?:AKIA|ABIA|ACCA|ASIA)[A-Z0-9]{16}", re.I), "AWS access key", ThreatLevel.CRITICAL),
+    (re.compile(r"AIza[A-Za-z0-9_-]{35}", re.I), "Google API key", ThreatLevel.CRITICAL),
+    (re.compile(r"ghp_[A-Za-z0-9]{36}", re.I), "GitHub personal access token", ThreatLevel.CRITICAL),
+    (re.compile(r"(?:xox[bsapr])-[A-Za-z0-9-]{10,}", re.I), "Slack token", ThreatLevel.CRITICAL),
     # Generic patterns
-    (re.compile(r"(?:api[_-]?key|apikey|secret[_-]?key|access[_-]?token|auth[_-]?token)\s*[:=]\s*['\"][A-Za-z0-9+/=_-]{20,}['\"]", re.I),
-     "Generic API key/token", ThreatLevel.HIGH),
-    (re.compile(r"(?:password|passwd|pwd)\s*[:=]\s*['\"][^'\"]{8,}['\"]", re.I),
-     "Password in output", ThreatLevel.HIGH),
-    (re.compile(r"Bearer\s+[A-Za-z0-9._-]{20,}", re.I),
-     "Bearer token", ThreatLevel.HIGH),
-
+    (
+        re.compile(
+            r"(?:api[_-]?key|apikey|secret[_-]?key|access[_-]?token|auth[_-]?token)\s*[:=]\s*['\"][A-Za-z0-9+/=_-]{20,}['\"]",
+            re.I,
+        ),
+        "Generic API key/token",
+        ThreatLevel.HIGH,
+    ),
+    (
+        re.compile(r"(?:password|passwd|pwd)\s*[:=]\s*['\"][^'\"]{8,}['\"]", re.I),
+        "Password in output",
+        ThreatLevel.HIGH,
+    ),
+    (re.compile(r"Bearer\s+[A-Za-z0-9._-]{20,}", re.I), "Bearer token", ThreatLevel.HIGH),
     # Private keys
-    (re.compile(r"-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----", re.I),
-     "Private key", ThreatLevel.CRITICAL),
-    (re.compile(r"-----BEGIN\s+(?:EC\s+)?PRIVATE\s+KEY-----", re.I),
-     "EC private key", ThreatLevel.CRITICAL),
+    (re.compile(r"-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----", re.I), "Private key", ThreatLevel.CRITICAL),
+    (re.compile(r"-----BEGIN\s+(?:EC\s+)?PRIVATE\s+KEY-----", re.I), "EC private key", ThreatLevel.CRITICAL),
 ]
 
 _PII_PATTERNS = [
     # Credit card numbers (basic Luhn-eligible patterns)
-    (re.compile(r"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b"),
-     "Credit card number", ThreatLevel.HIGH),
+    (
+        re.compile(r"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b"),
+        "Credit card number",
+        ThreatLevel.HIGH,
+    ),
     # SSN
-    (re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
-     "Social Security Number", ThreatLevel.HIGH),
+    (re.compile(r"\b\d{3}-\d{2}-\d{4}\b"), "Social Security Number", ThreatLevel.HIGH),
     # Email (only flag if appears to be part of exfiltration, not normal content)
-    (re.compile(r"(?:email|e-mail|correo)\s*[:=]\s*[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}"),
-     "Email in key-value context", ThreatLevel.MEDIUM),
+    (
+        re.compile(r"(?:email|e-mail|correo)\s*[:=]\s*[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}"),
+        "Email in key-value context",
+        ThreatLevel.MEDIUM,
+    ),
 ]
 
 # Crypto wallet private keys / seed phrases
 _CRYPTO_PATTERNS = [
-    (re.compile(r"(?:0x)?[0-9a-fA-F]{64}", re.I),
-     "Possible private key (64 hex chars)", ThreatLevel.CRITICAL),
-    (re.compile(r"(?:seed|mnemonic|recovery)\s*(?:phrase|words)?\s*[:=]\s*(?:\w+\s+){11,23}\w+", re.I),
-     "Seed phrase / mnemonic", ThreatLevel.CRITICAL),
+    (re.compile(r"(?:0x)?[0-9a-fA-F]{64}", re.I), "Possible private key (64 hex chars)", ThreatLevel.CRITICAL),
+    (
+        re.compile(r"(?:seed|mnemonic|recovery)\s*(?:phrase|words)?\s*[:=]\s*(?:\w+\s+){11,23}\w+", re.I),
+        "Seed phrase / mnemonic",
+        ThreatLevel.CRITICAL,
+    ),
 ]
 
 
@@ -104,8 +114,7 @@ class ExfiltrationGuardLayer:
     def __init__(self, config: ShieldConfig, catalog: ThreatCatalog) -> None:
         self._config = config
         self._catalog = catalog
-        self._stats = {"checks": 0, "secrets_found": 0, "pii_found": 0, "blocks": 0,
-                       "canary_leaks": 0, "dns_exfil": 0}
+        self._stats = {"checks": 0, "secrets_found": 0, "pii_found": 0, "blocks": 0, "canary_leaks": 0, "dns_exfil": 0}
 
     async def check(
         self,
@@ -131,50 +140,56 @@ class ExfiltrationGuardLayer:
             match = pattern.search(output)
             if match:
                 self._stats["secrets_found"] += 1
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.DATA_EXFILTRATION,
-                    level=level,
-                    verdict=ShieldVerdict.BLOCK if level == ThreatLevel.CRITICAL else ShieldVerdict.SANITIZE,
-                    description=f"Secret detected in output: {desc}",
-                    evidence=self._redact(match.group(0)),
-                    layer=self.LAYER_NAME,
-                    confidence=0.90,
-                    suggested_action="Redact secret from output",
-                    signature_id="EG-SECRET",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.DATA_EXFILTRATION,
+                        level=level,
+                        verdict=ShieldVerdict.BLOCK if level == ThreatLevel.CRITICAL else ShieldVerdict.SANITIZE,
+                        description=f"Secret detected in output: {desc}",
+                        evidence=self._redact(match.group(0)),
+                        layer=self.LAYER_NAME,
+                        confidence=0.90,
+                        suggested_action="Redact secret from output",
+                        signature_id="EG-SECRET",
+                    )
+                )
 
         # === Check 2: PII ===
         for pattern, desc, level in _PII_PATTERNS:
             match = pattern.search(output)
             if match:
                 self._stats["pii_found"] += 1
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.DATA_EXFILTRATION,
-                    level=level,
-                    verdict=ShieldVerdict.SANITIZE,
-                    description=f"PII detected in output: {desc}",
-                    evidence=self._redact(match.group(0)),
-                    layer=self.LAYER_NAME,
-                    confidence=0.80,
-                    suggested_action="Redact PII from output",
-                    signature_id="EG-PII",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.DATA_EXFILTRATION,
+                        level=level,
+                        verdict=ShieldVerdict.SANITIZE,
+                        description=f"PII detected in output: {desc}",
+                        evidence=self._redact(match.group(0)),
+                        layer=self.LAYER_NAME,
+                        confidence=0.80,
+                        suggested_action="Redact PII from output",
+                        signature_id="EG-PII",
+                    )
+                )
 
         # === Check 3: Crypto secrets ===
         for pattern, desc, level in _CRYPTO_PATTERNS:
             match = pattern.search(output)
             if match:
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.DATA_EXFILTRATION,
-                    level=level,
-                    verdict=ShieldVerdict.BLOCK,
-                    description=f"Crypto secret detected: {desc}",
-                    evidence=self._redact(match.group(0)),
-                    layer=self.LAYER_NAME,
-                    confidence=0.85,
-                    suggested_action="Block crypto key exposure",
-                    signature_id="EG-CRYPTO",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.DATA_EXFILTRATION,
+                        level=level,
+                        verdict=ShieldVerdict.BLOCK,
+                        description=f"Crypto secret detected: {desc}",
+                        evidence=self._redact(match.group(0)),
+                        layer=self.LAYER_NAME,
+                        confidence=0.85,
+                        suggested_action="Block crypto key exposure",
+                        signature_id="EG-CRYPTO",
+                    )
+                )
 
         # === Check 4: Egress domain check (if context has URL) ===
         if context and "url" in context:
@@ -194,7 +209,11 @@ class ExfiltrationGuardLayer:
             threats.append(canary_threat)
 
         # === Check 7: DNS exfiltration detection ===
-        urls = re.findall(r"https?://[^\s<>\"']+|[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?){3,}", output, re.I)
+        urls = re.findall(
+            r"https?://[^\s<>\"']+|[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?){3,}",
+            output,
+            re.I,
+        )
         for url in urls:
             dns_threat = self._check_dns_exfiltration(url)
             if dns_threat:
@@ -216,7 +235,9 @@ class ExfiltrationGuardLayer:
 
         logger.warning(
             "[ExfiltrationGuard] %s: %d leaks detected (%.1fms)",
-            verdict.value.upper(), len(threats), elapsed,
+            verdict.value.upper(),
+            len(threats),
+            elapsed,
         )
 
         return ShieldDecision(
@@ -235,6 +256,7 @@ class ExfiltrationGuardLayer:
         the model was tricked into outputting its injected context.
         """
         from zugashield.layers.prompt_armor import get_canary_tokens
+
         tokens = get_canary_tokens()
 
         # Check session-specific canary
@@ -376,6 +398,7 @@ class ExfiltrationGuardLayer:
     def _check_egress_domain(self, url: str) -> Optional[ThreatDetection]:
         """Check if a URL is on the egress allowlist."""
         from urllib.parse import urlparse
+
         try:
             parsed = urlparse(url)
             domain = parsed.hostname or ""

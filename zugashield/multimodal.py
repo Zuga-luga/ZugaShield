@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 # Optional Pillow import
 try:
     from PIL import Image
+
     _HAS_PILLOW = True
 except ImportError:
     Image = None
@@ -119,10 +120,16 @@ class MultimodalScanner:
             return allow_decision(self.LAYER_NAME, elapsed)
 
         self._stats["detections"] += len(threats)
-        max_threat = max(threats, key=lambda t: [
-            ThreatLevel.NONE, ThreatLevel.LOW, ThreatLevel.MEDIUM,
-            ThreatLevel.HIGH, ThreatLevel.CRITICAL,
-        ].index(t.level))
+        max_threat = max(
+            threats,
+            key=lambda t: [
+                ThreatLevel.NONE,
+                ThreatLevel.LOW,
+                ThreatLevel.MEDIUM,
+                ThreatLevel.HIGH,
+                ThreatLevel.CRITICAL,
+            ].index(t.level),
+        )
         verdict = ShieldVerdict.BLOCK if max_threat.level >= ThreatLevel.CRITICAL else ShieldVerdict.QUARANTINE
 
         return ShieldDecision(
@@ -146,7 +153,7 @@ class MultimodalScanner:
                     threats.extend(field_threats)
 
             # Check EXIF specifically
-            if hasattr(img, '_getexif') and img._getexif():
+            if hasattr(img, "_getexif") and img._getexif():
                 for tag_id, value in img._getexif().items():
                     if isinstance(value, str):
                         field_threats = self._check_text_for_injection(value, f"exif_tag:{tag_id}")
@@ -177,17 +184,19 @@ class MultimodalScanner:
         ]:
             match = pattern.search(text)
             if match:
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.INDIRECT_INJECTION,
-                    level=ThreatLevel.HIGH,
-                    verdict=ShieldVerdict.QUARANTINE,
-                    description=f"{desc} in image {source}: {match.group(0)[:60]}",
-                    evidence=match.group(0)[:200],
-                    layer=self.LAYER_NAME,
-                    confidence=0.85,
-                    suggested_action=f"Strip injection from image {source}",
-                    signature_id=sig_id,
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.INDIRECT_INJECTION,
+                        level=ThreatLevel.HIGH,
+                        verdict=ShieldVerdict.QUARANTINE,
+                        description=f"{desc} in image {source}: {match.group(0)[:60]}",
+                        evidence=match.group(0)[:200],
+                        layer=self.LAYER_NAME,
+                        confidence=0.85,
+                        suggested_action=f"Strip injection from image {source}",
+                        signature_id=sig_id,
+                    )
+                )
 
         return threats
 

@@ -48,21 +48,21 @@ class ThreatCategory(str, Enum):
 class ShieldVerdict(str, Enum):
     """Action to take on detection. Mirrors GovernorVerdict pattern."""
 
-    ALLOW = "allow"           # Clean, proceed
-    SANITIZE = "sanitize"     # Modified input, proceed with cleaned version
-    CHALLENGE = "challenge"   # Ask user to confirm intent
-    QUARANTINE = "quarantine" # Log + block + alert
-    BLOCK = "block"           # Hard block, no bypass
+    ALLOW = "allow"  # Clean, proceed
+    SANITIZE = "sanitize"  # Modified input, proceed with cleaned version
+    CHALLENGE = "challenge"  # Ask user to confirm intent
+    QUARANTINE = "quarantine"  # Log + block + alert
+    BLOCK = "block"  # Hard block, no bypass
 
 
 class MemoryTrust(str, Enum):
     """Trust levels for memory provenance tracking."""
 
-    VERIFIED = "verified"         # Explicitly confirmed by user
-    USER_DIRECT = "user_direct"   # From user chat (trusted)
-    BRAIN_GENERATED = "brain"     # From brain thoughts (medium trust)
-    EXTERNAL = "external"         # From web/files (low trust, spotlight in prompt)
-    UNKNOWN = "unknown"           # Legacy memories without provenance (flag)
+    VERIFIED = "verified"  # Explicitly confirmed by user
+    USER_DIRECT = "user_direct"  # From user chat (trusted)
+    BRAIN_GENERATED = "brain"  # From brain thoughts (medium trust)
+    EXTERNAL = "external"  # From web/files (low trust, spotlight in prompt)
+    UNKNOWN = "unknown"  # Legacy memories without provenance (flag)
 
 
 # =============================================================================
@@ -78,9 +78,9 @@ class ThreatDetection:
     level: ThreatLevel
     verdict: ShieldVerdict
     description: str
-    evidence: str                     # What triggered detection
-    layer: str                        # Which layer detected it
-    confidence: float                 # 0.0-1.0
+    evidence: str  # What triggered detection
+    layer: str  # Which layer detected it
+    confidence: float  # 0.0-1.0
     suggested_action: str
     timestamp: datetime = field(default_factory=datetime.utcnow)
     signature_id: Optional[str] = None  # Threat catalog reference
@@ -119,8 +119,7 @@ class ShieldDecision:
     def max_threat_level(self) -> ThreatLevel:
         if not self.threats_detected:
             return ThreatLevel.NONE
-        level_order = [ThreatLevel.NONE, ThreatLevel.LOW, ThreatLevel.MEDIUM,
-                       ThreatLevel.HIGH, ThreatLevel.CRITICAL]
+        level_order = [ThreatLevel.NONE, ThreatLevel.LOW, ThreatLevel.MEDIUM, ThreatLevel.HIGH, ThreatLevel.CRITICAL]
         return max(self.threats_detected, key=lambda t: level_order.index(t.level)).level
 
 
@@ -128,9 +127,9 @@ class ShieldDecision:
 class AnomalyScore:
     """Behavioral anomaly scoring for session risk assessment."""
 
-    session_score: float = 0.0       # 0-100, current session risk
-    cumulative_score: float = 0.0    # 0-100, rolling risk across sessions
-    decay_rate: float = 0.95         # How fast old events decay
+    session_score: float = 0.0  # 0-100, current session risk
+    cumulative_score: float = 0.0  # 0-100, rolling risk across sessions
+    decay_rate: float = 0.95  # How fast old events decay
     contributing_events: List[ThreatDetection] = field(default_factory=list)
 
     @property
@@ -150,9 +149,9 @@ class AnomalyScore:
 class ToolPolicy:
     """Policy for a specific tool's usage constraints."""
 
-    rate: int = 30           # Max calls per minute
-    approval: bool = False   # Requires user approval
-    risk: str = "low"        # Risk level: low, medium, high, critical
+    rate: int = 30  # Max calls per minute
+    approval: bool = False  # Requires user approval
+    risk: str = "low"  # Risk level: low, medium, high, critical
 
 
 # =============================================================================

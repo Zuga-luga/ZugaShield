@@ -137,27 +137,35 @@ class AnomalyDetectorLayer:
 
         # === Check 3: Score threshold ===
         if score.session_score > self._config.anomaly_threshold:
-            threats.append(ThreatDetection(
-                category=ThreatCategory.BEHAVIORAL_ANOMALY,
-                level=score.threat_level,
-                verdict=ShieldVerdict.CHALLENGE if score.threat_level <= ThreatLevel.HIGH else ShieldVerdict.BLOCK,
-                description=f"Session anomaly score exceeded threshold: {score.session_score:.1f}/{self._config.anomaly_threshold}",
-                evidence=f"Score: {score.session_score:.1f}, Events: {len(score.contributing_events)}",
-                layer=self.LAYER_NAME,
-                confidence=0.75,
-                suggested_action="Increase monitoring or require confirmation",
-                signature_id="AD-SCORE",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.BEHAVIORAL_ANOMALY,
+                    level=score.threat_level,
+                    verdict=ShieldVerdict.CHALLENGE if score.threat_level <= ThreatLevel.HIGH else ShieldVerdict.BLOCK,
+                    description=f"Session anomaly score exceeded threshold: {score.session_score:.1f}/{self._config.anomaly_threshold}",
+                    evidence=f"Score: {score.session_score:.1f}, Events: {len(score.contributing_events)}",
+                    layer=self.LAYER_NAME,
+                    confidence=0.75,
+                    suggested_action="Increase monitoring or require confirmation",
+                    signature_id="AD-SCORE",
+                )
+            )
 
         elapsed = (time.perf_counter() - start) * 1000
 
         if not threats:
             return allow_decision(self.LAYER_NAME, elapsed)
 
-        max_threat = max(threats, key=lambda t: [
-            ThreatLevel.NONE, ThreatLevel.LOW, ThreatLevel.MEDIUM,
-            ThreatLevel.HIGH, ThreatLevel.CRITICAL,
-        ].index(t.level))
+        max_threat = max(
+            threats,
+            key=lambda t: [
+                ThreatLevel.NONE,
+                ThreatLevel.LOW,
+                ThreatLevel.MEDIUM,
+                ThreatLevel.HIGH,
+                ThreatLevel.CRITICAL,
+            ].index(t.level),
+        )
 
         verdict = ShieldVerdict.BLOCK if max_threat.level >= ThreatLevel.CRITICAL else ShieldVerdict.CHALLENGE
 
@@ -186,17 +194,21 @@ class AnomalyDetectorLayer:
             if distinct >= 2 and matching >= min_count:
                 self._stats["chains_detected"] += 1
                 self._stats["escalations"] += 1
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.CHAIN_ATTACK,
-                    level=escalated_level,
-                    verdict=ShieldVerdict.BLOCK if escalated_level >= ThreatLevel.CRITICAL else ShieldVerdict.QUARANTINE,
-                    description=f"Chain attack: {desc}",
-                    evidence=f"Categories: {dict(recent_categories)}, matching: {matching}",
-                    layer=self.LAYER_NAME,
-                    confidence=0.80,
-                    suggested_action="Block chain attack and alert",
-                    signature_id="AD-CHAIN",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.CHAIN_ATTACK,
+                        level=escalated_level,
+                        verdict=ShieldVerdict.BLOCK
+                        if escalated_level >= ThreatLevel.CRITICAL
+                        else ShieldVerdict.QUARANTINE,
+                        description=f"Chain attack: {desc}",
+                        evidence=f"Categories: {dict(recent_categories)}, matching: {matching}",
+                        layer=self.LAYER_NAME,
+                        confidence=0.80,
+                        suggested_action="Block chain attack and alert",
+                        signature_id="AD-CHAIN",
+                    )
+                )
 
         return threats
 
@@ -222,17 +234,19 @@ class AnomalyDetectorLayer:
                 alternations += 1
 
         if alternations >= 3:
-            return [ThreatDetection(
-                category=ThreatCategory.BEHAVIORAL_ANOMALY,
-                level=ThreatLevel.HIGH,
-                verdict=ShieldVerdict.QUARANTINE,
-                description=f"Alternating benign/malicious pattern: {alternations} alternations in {len(recent)} events",
-                evidence=f"Levels: {[lv.value for lv in levels]}",
-                layer=self.LAYER_NAME,
-                confidence=0.70,
-                suggested_action="Increase scrutiny on all requests",
-                signature_id="AD-ALT",
-            )]
+            return [
+                ThreatDetection(
+                    category=ThreatCategory.BEHAVIORAL_ANOMALY,
+                    level=ThreatLevel.HIGH,
+                    verdict=ShieldVerdict.QUARANTINE,
+                    description=f"Alternating benign/malicious pattern: {alternations} alternations in {len(recent)} events",
+                    evidence=f"Levels: {[lv.value for lv in levels]}",
+                    layer=self.LAYER_NAME,
+                    confidence=0.70,
+                    suggested_action="Increase scrutiny on all requests",
+                    signature_id="AD-ALT",
+                )
+            ]
 
         return []
 

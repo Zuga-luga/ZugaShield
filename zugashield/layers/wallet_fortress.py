@@ -76,8 +76,11 @@ class WalletFortressLayer:
         self._daily_spend: deque = deque(maxlen=10000)
         self._last_approval_time: float = 0
         self._stats = {
-            "checks": 0, "blocked": 0, "limit_exceeded": 0,
-            "new_address_challenges": 0, "homoglyphs_detected": 0,
+            "checks": 0,
+            "blocked": 0,
+            "limit_exceeded": 0,
+            "new_address_challenges": 0,
+            "homoglyphs_detected": 0,
         }
 
     async def check(
@@ -111,17 +114,19 @@ class WalletFortressLayer:
         now = time.time()
         if now - self._last_approval_time < self._config.wallet_approval_cooldown:
             remaining = self._config.wallet_approval_cooldown - (now - self._last_approval_time)
-            threats.append(ThreatDetection(
-                category=ThreatCategory.WALLET_ATTACK,
-                level=ThreatLevel.HIGH,
-                verdict=ShieldVerdict.BLOCK,
-                description=f"Transaction cooldown: {remaining:.0f}s remaining",
-                evidence=f"Last approval {now - self._last_approval_time:.0f}s ago",
-                layer=self.LAYER_NAME,
-                confidence=0.99,
-                suggested_action=f"Wait {remaining:.0f}s before next transaction",
-                signature_id="WF-COOL",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.WALLET_ATTACK,
+                    level=ThreatLevel.HIGH,
+                    verdict=ShieldVerdict.BLOCK,
+                    description=f"Transaction cooldown: {remaining:.0f}s remaining",
+                    evidence=f"Last approval {now - self._last_approval_time:.0f}s ago",
+                    layer=self.LAYER_NAME,
+                    confidence=0.99,
+                    suggested_action=f"Wait {remaining:.0f}s before next transaction",
+                    signature_id="WF-COOL",
+                )
+            )
 
         # === Check 2: Spend limits ===
         limit_threats = self._check_spend_limits(amount_usd)
@@ -148,17 +153,19 @@ class WalletFortressLayer:
         if not threats:
             return ShieldDecision(
                 verdict=ShieldVerdict.CHALLENGE,
-                threats_detected=[ThreatDetection(
-                    category=ThreatCategory.WALLET_ATTACK,
-                    level=ThreatLevel.LOW,
-                    verdict=ShieldVerdict.CHALLENGE,
-                    description=f"Wallet transaction requires approval: {tx_type} ${amount_usd:.2f}",
-                    evidence=f"To: {to_address[:20]}..., Amount: ${amount_usd:.2f}",
-                    layer=self.LAYER_NAME,
-                    confidence=1.0,
-                    suggested_action="Require user approval",
-                    signature_id="WF-APPROVE",
-                )],
+                threats_detected=[
+                    ThreatDetection(
+                        category=ThreatCategory.WALLET_ATTACK,
+                        level=ThreatLevel.LOW,
+                        verdict=ShieldVerdict.CHALLENGE,
+                        description=f"Wallet transaction requires approval: {tx_type} ${amount_usd:.2f}",
+                        evidence=f"To: {to_address[:20]}..., Amount: ${amount_usd:.2f}",
+                        layer=self.LAYER_NAME,
+                        confidence=1.0,
+                        suggested_action="Require user approval",
+                        signature_id="WF-APPROVE",
+                    )
+                ],
                 layer=self.LAYER_NAME,
                 elapsed_ms=elapsed,
             )
@@ -172,9 +179,12 @@ class WalletFortressLayer:
 
         logger.warning(
             "[WalletFortress] %s: %s $%.2f to %s (%d threats, %.1fms)",
-            verdict.value.upper(), tx_type, amount_usd,
+            verdict.value.upper(),
+            tx_type,
+            amount_usd,
             to_address[:20] if to_address else "N/A",
-            len(threats), elapsed,
+            len(threats),
+            elapsed,
         )
 
         return ShieldDecision(
@@ -207,49 +217,55 @@ class WalletFortressLayer:
         # Per-transaction limit
         if amount_usd > self._config.wallet_tx_limit:
             self._stats["limit_exceeded"] += 1
-            threats.append(ThreatDetection(
-                category=ThreatCategory.WALLET_ATTACK,
-                level=ThreatLevel.HIGH,
-                verdict=ShieldVerdict.BLOCK,
-                description=f"Transaction exceeds limit: ${amount_usd:.2f} > ${self._config.wallet_tx_limit:.2f}",
-                evidence=f"Amount: ${amount_usd:.2f}, Limit: ${self._config.wallet_tx_limit:.2f}",
-                layer=self.LAYER_NAME,
-                confidence=0.99,
-                suggested_action="Reduce amount or increase limit",
-                signature_id="WF-TXLIMIT",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.WALLET_ATTACK,
+                    level=ThreatLevel.HIGH,
+                    verdict=ShieldVerdict.BLOCK,
+                    description=f"Transaction exceeds limit: ${amount_usd:.2f} > ${self._config.wallet_tx_limit:.2f}",
+                    evidence=f"Amount: ${amount_usd:.2f}, Limit: ${self._config.wallet_tx_limit:.2f}",
+                    layer=self.LAYER_NAME,
+                    confidence=0.99,
+                    suggested_action="Reduce amount or increase limit",
+                    signature_id="WF-TXLIMIT",
+                )
+            )
 
         # Hourly limit
         hourly = sum(amt for ts, amt in self._hourly_spend if ts > now - 3600) + amount_usd
         if hourly > self._config.wallet_hourly_limit:
             self._stats["limit_exceeded"] += 1
-            threats.append(ThreatDetection(
-                category=ThreatCategory.WALLET_ATTACK,
-                level=ThreatLevel.HIGH,
-                verdict=ShieldVerdict.BLOCK,
-                description=f"Hourly spend limit exceeded: ${hourly:.2f} > ${self._config.wallet_hourly_limit:.2f}",
-                evidence=f"Hourly total: ${hourly:.2f}",
-                layer=self.LAYER_NAME,
-                confidence=0.99,
-                suggested_action="Wait or increase hourly limit",
-                signature_id="WF-HOURLIMIT",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.WALLET_ATTACK,
+                    level=ThreatLevel.HIGH,
+                    verdict=ShieldVerdict.BLOCK,
+                    description=f"Hourly spend limit exceeded: ${hourly:.2f} > ${self._config.wallet_hourly_limit:.2f}",
+                    evidence=f"Hourly total: ${hourly:.2f}",
+                    layer=self.LAYER_NAME,
+                    confidence=0.99,
+                    suggested_action="Wait or increase hourly limit",
+                    signature_id="WF-HOURLIMIT",
+                )
+            )
 
         # Daily limit
         daily = sum(amt for ts, amt in self._daily_spend if ts > now - 86400) + amount_usd
         if daily > self._config.wallet_daily_limit:
             self._stats["limit_exceeded"] += 1
-            threats.append(ThreatDetection(
-                category=ThreatCategory.WALLET_ATTACK,
-                level=ThreatLevel.CRITICAL,
-                verdict=ShieldVerdict.BLOCK,
-                description=f"Daily spend limit exceeded: ${daily:.2f} > ${self._config.wallet_daily_limit:.2f}",
-                evidence=f"Daily total: ${daily:.2f}",
-                layer=self.LAYER_NAME,
-                confidence=0.99,
-                suggested_action="Wait or increase daily limit",
-                signature_id="WF-DAYLIMIT",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.WALLET_ATTACK,
+                    level=ThreatLevel.CRITICAL,
+                    verdict=ShieldVerdict.BLOCK,
+                    description=f"Daily spend limit exceeded: ${daily:.2f} > ${self._config.wallet_daily_limit:.2f}",
+                    evidence=f"Daily total: ${daily:.2f}",
+                    layer=self.LAYER_NAME,
+                    confidence=0.99,
+                    suggested_action="Wait or increase daily limit",
+                    signature_id="WF-DAYLIMIT",
+                )
+            )
 
         return threats
 
@@ -260,56 +276,65 @@ class WalletFortressLayer:
 
         # Blocklist check
         if addr_lower in self._blocklisted_addresses:
-            threats.append(ThreatDetection(
-                category=ThreatCategory.WALLET_ATTACK,
-                level=ThreatLevel.CRITICAL,
-                verdict=ShieldVerdict.BLOCK,
-                description="Destination address is blocklisted",
-                evidence=f"Address: {address}",
-                layer=self.LAYER_NAME,
-                confidence=0.99,
-                suggested_action="Block transaction to known malicious address",
-                signature_id="WF-BLOCKLIST",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.WALLET_ATTACK,
+                    level=ThreatLevel.CRITICAL,
+                    verdict=ShieldVerdict.BLOCK,
+                    description="Destination address is blocklisted",
+                    evidence=f"Address: {address}",
+                    layer=self.LAYER_NAME,
+                    confidence=0.99,
+                    suggested_action="Block transaction to known malicious address",
+                    signature_id="WF-BLOCKLIST",
+                )
+            )
             return threats
 
         # Allowlist check - new address needs challenge
         if addr_lower not in self._allowlisted_addresses and addr_lower not in self._known_addresses:
             self._stats["new_address_challenges"] += 1
-            threats.append(ThreatDetection(
-                category=ThreatCategory.WALLET_ATTACK,
-                level=ThreatLevel.LOW,
-                verdict=ShieldVerdict.CHALLENGE,
-                description="First-time recipient address",
-                evidence=f"Address: {address}",
-                layer=self.LAYER_NAME,
-                confidence=0.50,
-                suggested_action="Confirm new recipient address",
-                signature_id="WF-NEWADDR",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.WALLET_ATTACK,
+                    level=ThreatLevel.LOW,
+                    verdict=ShieldVerdict.CHALLENGE,
+                    description="First-time recipient address",
+                    evidence=f"Address: {address}",
+                    layer=self.LAYER_NAME,
+                    confidence=0.50,
+                    suggested_action="Confirm new recipient address",
+                    signature_id="WF-NEWADDR",
+                )
+            )
 
         # Homoglyph detection - check for Cyrillic/Greek characters in hex address
         if _ETH_ADDRESS.match(address):
             for i, c in enumerate(address[2:], 2):
                 if ord(c) > 127:
                     self._stats["homoglyphs_detected"] += 1
-                    threats.append(ThreatDetection(
-                        category=ThreatCategory.WALLET_ATTACK,
-                        level=ThreatLevel.CRITICAL,
-                        verdict=ShieldVerdict.BLOCK,
-                        description=f"Homoglyph attack: non-ASCII character at position {i}",
-                        evidence=f"Char '{c}' (U+{ord(c):04X}) at position {i}",
-                        layer=self.LAYER_NAME,
-                        confidence=0.95,
-                        suggested_action="Block address with homoglyph characters",
-                        signature_id="WF-HOMOGLYPH",
-                    ))
+                    threats.append(
+                        ThreatDetection(
+                            category=ThreatCategory.WALLET_ATTACK,
+                            level=ThreatLevel.CRITICAL,
+                            verdict=ShieldVerdict.BLOCK,
+                            description=f"Homoglyph attack: non-ASCII character at position {i}",
+                            evidence=f"Char '{c}' (U+{ord(c):04X}) at position {i}",
+                            layer=self.LAYER_NAME,
+                            confidence=0.95,
+                            suggested_action="Block address with homoglyph characters",
+                            signature_id="WF-HOMOGLYPH",
+                        )
+                    )
                     break
 
         return threats
 
     def _check_contract(
-        self, data: Optional[str], function_sig: Optional[str], amount_usd: float,
+        self,
+        data: Optional[str],
+        function_sig: Optional[str],
+        amount_usd: float,
     ) -> List[ThreatDetection]:
         """Check smart contract interaction safety."""
         threats = []
@@ -318,32 +343,36 @@ class WalletFortressLayer:
         if function_sig:
             for dangerous_sig, desc in _DANGEROUS_FUNCTIONS.items():
                 if dangerous_sig in function_sig:
-                    threats.append(ThreatDetection(
-                        category=ThreatCategory.WALLET_ATTACK,
-                        level=ThreatLevel.HIGH,
-                        verdict=ShieldVerdict.BLOCK,
-                        description=f"Dangerous contract function: {desc}",
-                        evidence=f"Function: {function_sig}",
-                        layer=self.LAYER_NAME,
-                        confidence=0.85,
-                        suggested_action=f"Review {desc} carefully before proceeding",
-                        signature_id="WF-FUNC",
-                    ))
+                    threats.append(
+                        ThreatDetection(
+                            category=ThreatCategory.WALLET_ATTACK,
+                            level=ThreatLevel.HIGH,
+                            verdict=ShieldVerdict.BLOCK,
+                            description=f"Dangerous contract function: {desc}",
+                            evidence=f"Function: {function_sig}",
+                            layer=self.LAYER_NAME,
+                            confidence=0.85,
+                            suggested_action=f"Review {desc} carefully before proceeding",
+                            signature_id="WF-FUNC",
+                        )
+                    )
 
         # Check for unlimited token approval
         if data:
             if _MAX_UINT256 in data.lower() or _MAX_UINT256_DEC in data:
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.WALLET_ATTACK,
-                    level=ThreatLevel.CRITICAL,
-                    verdict=ShieldVerdict.BLOCK,
-                    description="Unlimited token approval (MAX_UINT256)",
-                    evidence="Approval amount is MAX_UINT256 - allows unlimited spending",
-                    layer=self.LAYER_NAME,
-                    confidence=0.95,
-                    suggested_action="Use exact approval amount instead",
-                    signature_id="WF-UNLIMITED",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.WALLET_ATTACK,
+                        level=ThreatLevel.CRITICAL,
+                        verdict=ShieldVerdict.BLOCK,
+                        description="Unlimited token approval (MAX_UINT256)",
+                        evidence="Approval amount is MAX_UINT256 - allows unlimited spending",
+                        layer=self.LAYER_NAME,
+                        confidence=0.95,
+                        suggested_action="Use exact approval amount instead",
+                        signature_id="WF-UNLIMITED",
+                    )
+                )
 
         return threats
 

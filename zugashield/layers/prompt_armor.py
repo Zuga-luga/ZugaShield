@@ -40,6 +40,7 @@ from zugashield.types import (
 # TR39 confusable detection — falls back gracefully if not installed
 try:
     from confusable_homoglyphs import confusables as _confusables
+
     _HAS_CONFUSABLES = True
 except ImportError:
     _confusables = None
@@ -58,18 +59,39 @@ logger = logging.getLogger(__name__)
 # Keywords that indicate sensitive topic proximity (weighted)
 _SENSITIVE_TOPIC_WEIGHTS: Dict[str, float] = {
     # High-risk topics
-    "hack": 3.0, "exploit": 3.0, "bypass": 3.0, "override": 3.0,
-    "jailbreak": 4.0, "inject": 3.0, "injection": 3.0,
-    "vulnerability": 2.5, "attack": 2.5, "malicious": 3.0,
-    "reverse shell": 4.0, "privilege escalation": 3.5,
-    "password": 1.5, "credential": 2.0, "private key": 3.0,
-    "mnemonic": 2.5, "seed phrase": 3.0, "wallet drain": 4.0,
+    "hack": 3.0,
+    "exploit": 3.0,
+    "bypass": 3.0,
+    "override": 3.0,
+    "jailbreak": 4.0,
+    "inject": 3.0,
+    "injection": 3.0,
+    "vulnerability": 2.5,
+    "attack": 2.5,
+    "malicious": 3.0,
+    "reverse shell": 4.0,
+    "privilege escalation": 3.5,
+    "password": 1.5,
+    "credential": 2.0,
+    "private key": 3.0,
+    "mnemonic": 2.5,
+    "seed phrase": 3.0,
+    "wallet drain": 4.0,
     # Medium-risk topics (benign alone, escalation signals in sequence)
-    "security": 0.5, "encryption": 0.5, "token": 0.8,
-    "permission": 0.8, "access control": 1.0, "authentication": 0.8,
-    "obfuscate": 1.5, "encode": 0.8, "decode": 0.8,
-    "disable": 1.5, "unrestricted": 2.5, "no filter": 2.5,
-    "no restriction": 2.5, "safety off": 3.0,
+    "security": 0.5,
+    "encryption": 0.5,
+    "token": 0.8,
+    "permission": 0.8,
+    "access control": 1.0,
+    "authentication": 0.8,
+    "obfuscate": 1.5,
+    "encode": 0.8,
+    "decode": 0.8,
+    "disable": 1.5,
+    "unrestricted": 2.5,
+    "no filter": 2.5,
+    "no restriction": 2.5,
+    "safety off": 3.0,
 }
 
 # Escalation phrases: benign questions that precede privilege escalation
@@ -87,10 +109,12 @@ _ESCALATION_TRANSITIONS = re.compile(
 @dataclass
 class _SessionEscalation:
     """Track per-session escalation for crescendo detection."""
+
     scores: deque = field(default_factory=lambda: deque(maxlen=20))
     cumulative: float = 0.0
     last_update: float = 0.0
     transition_count: int = 0
+
 
 # =============================================================================
 # Pre-compiled fast-path patterns (no catalog dependency)
@@ -100,26 +124,66 @@ class _SessionEscalation:
 # that catch the vast majority of injection attempts.
 _FAST_PATTERNS: List[tuple] = [
     # (compiled_regex, signature_id, description, severity)
-    (re.compile(r"ignore\s+(?:all\s+)?(?:previous|prior|above|earlier)\s+(?:instructions|directives|rules|prompts)", re.I),
-     "FP-001", "Ignore previous instructions", ThreatLevel.CRITICAL),
-    (re.compile(r"you\s+are\s+now\s+(?:a|an|the|my)?\s*(?:new|different|unrestricted|unfiltered|jailbroken)", re.I),
-     "FP-002", "Role hijacking attempt", ThreatLevel.CRITICAL),
-    (re.compile(r"(?:act|pretend|behave)\s+as\s+(?:a|an)?\s*(?:unrestricted|unfiltered|jailbroken|evil|DAN)", re.I),
-     "FP-003", "DAN/jailbreak role assignment", ThreatLevel.CRITICAL),
-    (re.compile(r"\bDAN\b.*?(?:mode|jailbreak|anything\s+now|no\s+restrictions)", re.I),
-     "FP-004", "DAN jailbreak pattern", ThreatLevel.CRITICAL),
-    (re.compile(r"(?:system|override)\s*prompt\s*(?:override|replacement|injection)", re.I),
-     "FP-005", "System prompt override", ThreatLevel.CRITICAL),
-    (re.compile(r"(?:disable|turn\s+off|deactivate|remove|bypass)\s+(?:all\s+)?(?:safety|security|filter|restriction|guardrail)", re.I),
-     "FP-006", "Safety bypass request", ThreatLevel.CRITICAL),
-    (re.compile(r"<\|(?:im_start|im_end|system|endoftext|sep)\|>", re.I),
-     "FP-007", "Token smuggling attempt", ThreatLevel.HIGH),
-    (re.compile(r"\[INST\].*?\[/INST\]", re.I | re.DOTALL),
-     "FP-008", "Instruction delimiter injection", ThreatLevel.HIGH),
-    (re.compile(r"<<SYS>>.*?<</SYS>>", re.I | re.DOTALL),
-     "FP-009", "System tag injection", ThreatLevel.HIGH),
-    (re.compile(r"(?:enter|switch\s+to|enable)\s+(?:developer|debug|admin|sudo|god)\s+mode", re.I),
-     "FP-010", "Privilege mode activation", ThreatLevel.CRITICAL),
+    (
+        re.compile(
+            r"ignore\s+(?:all\s+)?(?:previous|prior|above|earlier)\s+(?:instructions|directives|rules|prompts)", re.I
+        ),
+        "FP-001",
+        "Ignore previous instructions",
+        ThreatLevel.CRITICAL,
+    ),
+    (
+        re.compile(r"you\s+are\s+now\s+(?:a|an|the|my)?\s*(?:new|different|unrestricted|unfiltered|jailbroken)", re.I),
+        "FP-002",
+        "Role hijacking attempt",
+        ThreatLevel.CRITICAL,
+    ),
+    (
+        re.compile(r"(?:act|pretend|behave)\s+as\s+(?:a|an)?\s*(?:unrestricted|unfiltered|jailbroken|evil|DAN)", re.I),
+        "FP-003",
+        "DAN/jailbreak role assignment",
+        ThreatLevel.CRITICAL,
+    ),
+    (
+        re.compile(r"\bDAN\b.*?(?:mode|jailbreak|anything\s+now|no\s+restrictions)", re.I),
+        "FP-004",
+        "DAN jailbreak pattern",
+        ThreatLevel.CRITICAL,
+    ),
+    (
+        re.compile(r"(?:system|override)\s*prompt\s*(?:override|replacement|injection)", re.I),
+        "FP-005",
+        "System prompt override",
+        ThreatLevel.CRITICAL,
+    ),
+    (
+        re.compile(
+            r"(?:disable|turn\s+off|deactivate|remove|bypass)\s+(?:all\s+)?(?:safety|security|filter|restriction|guardrail)",
+            re.I,
+        ),
+        "FP-006",
+        "Safety bypass request",
+        ThreatLevel.CRITICAL,
+    ),
+    (
+        re.compile(r"<\|(?:im_start|im_end|system|endoftext|sep)\|>", re.I),
+        "FP-007",
+        "Token smuggling attempt",
+        ThreatLevel.HIGH,
+    ),
+    (
+        re.compile(r"\[INST\].*?\[/INST\]", re.I | re.DOTALL),
+        "FP-008",
+        "Instruction delimiter injection",
+        ThreatLevel.HIGH,
+    ),
+    (re.compile(r"<<SYS>>.*?<</SYS>>", re.I | re.DOTALL), "FP-009", "System tag injection", ThreatLevel.HIGH),
+    (
+        re.compile(r"(?:enter|switch\s+to|enable)\s+(?:developer|debug|admin|sudo|god)\s+mode", re.I),
+        "FP-010",
+        "Privilege mode activation",
+        ThreatLevel.CRITICAL,
+    ),
 ]
 
 # Unicode detection patterns
@@ -153,7 +217,10 @@ _DOC_EMBED_PATTERNS = [
     re.compile(r"display\s*:\s*none", re.I),
     re.compile(r"visibility\s*:\s*hidden", re.I),
     re.compile(r"opacity\s*:\s*0(?:\.0+)?\s*[;}]", re.I),
-    re.compile(r"color\s*:\s*(?:white|#fff(?:fff)?|rgba?\(\s*255\s*,\s*255\s*,\s*255)\s*[;}].*?background(?:-color)?\s*:\s*(?:white|#fff(?:fff)?|rgba?\(\s*255\s*,\s*255\s*,\s*255)", re.I | re.DOTALL),
+    re.compile(
+        r"color\s*:\s*(?:white|#fff(?:fff)?|rgba?\(\s*255\s*,\s*255\s*,\s*255)\s*[;}].*?background(?:-color)?\s*:\s*(?:white|#fff(?:fff)?|rgba?\(\s*255\s*,\s*255\s*,\s*255)",
+        re.I | re.DOTALL,
+    ),
     re.compile(r"position\s*:\s*(?:absolute|fixed)\s*[;}].*?(?:left|top)\s*:\s*-\d{4,}px", re.I | re.DOTALL),
     re.compile(r"(?:height|width)\s*:\s*[01]px", re.I),
     re.compile(r"overflow\s*:\s*hidden\s*[;}].*?(?:height|width)\s*:\s*0", re.I | re.DOTALL),
@@ -232,10 +299,13 @@ class PromptArmorLayer:
         all_threats.extend(fast_threats)
 
         # === Strategy 2: Catalog signature matching ===
-        catalog_threats = self._catalog.check(text, [
-            ThreatCategory.PROMPT_INJECTION,
-            ThreatCategory.INDIRECT_INJECTION,
-        ])
+        catalog_threats = self._catalog.check(
+            text,
+            [
+                ThreatCategory.PROMPT_INJECTION,
+                ThreatCategory.INDIRECT_INJECTION,
+            ],
+        )
         all_threats.extend(catalog_threats)
 
         # === Strategy 3: Unicode analysis ===
@@ -288,10 +358,16 @@ class PromptArmorLayer:
         self._stats["detections"] += len(unique_threats)
 
         # Determine overall verdict from worst threat
-        max_level = max(unique_threats, key=lambda t: [
-            ThreatLevel.NONE, ThreatLevel.LOW, ThreatLevel.MEDIUM,
-            ThreatLevel.HIGH, ThreatLevel.CRITICAL,
-        ].index(t.level))
+        max_level = max(
+            unique_threats,
+            key=lambda t: [
+                ThreatLevel.NONE,
+                ThreatLevel.LOW,
+                ThreatLevel.MEDIUM,
+                ThreatLevel.HIGH,
+                ThreatLevel.CRITICAL,
+            ].index(t.level),
+        )
 
         if max_level.level == ThreatLevel.CRITICAL:
             verdict = ShieldVerdict.BLOCK
@@ -314,7 +390,9 @@ class PromptArmorLayer:
         logger.warning(
             "[PromptArmor] %s: %d threats detected in %.1fms (verdict=%s)",
             "BLOCKED" if verdict in (ShieldVerdict.BLOCK, ShieldVerdict.QUARANTINE) else "FLAGGED",
-            len(unique_threats), elapsed, verdict.value,
+            len(unique_threats),
+            elapsed,
+            verdict.value,
         )
 
         return ShieldDecision(
@@ -331,17 +409,19 @@ class PromptArmorLayer:
         for pattern, sig_id, description, severity in _FAST_PATTERNS:
             match = pattern.search(text)
             if match:
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.PROMPT_INJECTION,
-                    level=severity,
-                    verdict=ShieldVerdict.BLOCK if severity == ThreatLevel.CRITICAL else ShieldVerdict.QUARANTINE,
-                    description=description,
-                    evidence=match.group(0)[:200],
-                    layer=self.LAYER_NAME,
-                    confidence=0.92,
-                    suggested_action="Block prompt injection attempt",
-                    signature_id=sig_id,
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.PROMPT_INJECTION,
+                        level=severity,
+                        verdict=ShieldVerdict.BLOCK if severity == ThreatLevel.CRITICAL else ShieldVerdict.QUARANTINE,
+                        description=description,
+                        evidence=match.group(0)[:200],
+                        layer=self.LAYER_NAME,
+                        confidence=0.92,
+                        suggested_action="Block prompt injection attempt",
+                        signature_id=sig_id,
+                    )
+                )
         return threats
 
     def _check_unicode(self, text: str) -> List[ThreatDetection]:
@@ -351,47 +431,53 @@ class PromptArmorLayer:
         # Check for invisible characters
         invisible_matches = _INVISIBLE_CHARS.findall(text)
         if len(invisible_matches) > 3:  # A few may be legitimate
-            threats.append(ThreatDetection(
-                category=ThreatCategory.UNICODE_SMUGGLING,
-                level=ThreatLevel.HIGH,
-                verdict=ShieldVerdict.QUARANTINE,
-                description=f"Found {len(invisible_matches)} invisible Unicode characters",
-                evidence=f"Chars: {[hex(ord(c)) for c in invisible_matches[:10]]}",
-                layer=self.LAYER_NAME,
-                confidence=0.85,
-                suggested_action="Strip invisible characters and re-check",
-                signature_id="UA-INV",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.UNICODE_SMUGGLING,
+                    level=ThreatLevel.HIGH,
+                    verdict=ShieldVerdict.QUARANTINE,
+                    description=f"Found {len(invisible_matches)} invisible Unicode characters",
+                    evidence=f"Chars: {[hex(ord(c)) for c in invisible_matches[:10]]}",
+                    layer=self.LAYER_NAME,
+                    confidence=0.85,
+                    suggested_action="Strip invisible characters and re-check",
+                    signature_id="UA-INV",
+                )
+            )
 
         # Check for RTL override
         rtl_matches = _RTL_OVERRIDE.findall(text)
         if rtl_matches:
-            threats.append(ThreatDetection(
-                category=ThreatCategory.UNICODE_SMUGGLING,
-                level=ThreatLevel.HIGH,
-                verdict=ShieldVerdict.QUARANTINE,
-                description=f"RTL override characters detected ({len(rtl_matches)})",
-                evidence="Positions with RTL override",
-                layer=self.LAYER_NAME,
-                confidence=0.90,
-                suggested_action="Strip RTL overrides and re-check",
-                signature_id="UA-RTL",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.UNICODE_SMUGGLING,
+                    level=ThreatLevel.HIGH,
+                    verdict=ShieldVerdict.QUARANTINE,
+                    description=f"RTL override characters detected ({len(rtl_matches)})",
+                    evidence="Positions with RTL override",
+                    layer=self.LAYER_NAME,
+                    confidence=0.90,
+                    suggested_action="Strip RTL overrides and re-check",
+                    signature_id="UA-RTL",
+                )
+            )
 
         # Check for tag characters
         tag_matches = _TAG_CHARS.findall(text)
         if tag_matches:
-            threats.append(ThreatDetection(
-                category=ThreatCategory.UNICODE_SMUGGLING,
-                level=ThreatLevel.HIGH,
-                verdict=ShieldVerdict.QUARANTINE,
-                description=f"Unicode tag characters detected ({len(tag_matches)})",
-                evidence="Tag chars in U+E0000 range",
-                layer=self.LAYER_NAME,
-                confidence=0.90,
-                suggested_action="Strip tag characters",
-                signature_id="UA-TAG",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.UNICODE_SMUGGLING,
+                    level=ThreatLevel.HIGH,
+                    verdict=ShieldVerdict.QUARANTINE,
+                    description=f"Unicode tag characters detected ({len(tag_matches)})",
+                    evidence="Tag chars in U+E0000 range",
+                    layer=self.LAYER_NAME,
+                    confidence=0.90,
+                    suggested_action="Strip tag characters",
+                    signature_id="UA-TAG",
+                )
+            )
 
         # Check for mixed-script homoglyph attacks
         # Unlike other unicode attacks, homoglyphs use VERY FEW non-ASCII chars
@@ -399,34 +485,38 @@ class PromptArmorLayer:
         if text and len(text) > 3:
             homoglyphs = self._detect_homoglyphs(text)
             if homoglyphs:
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.UNICODE_SMUGGLING,
-                    level=ThreatLevel.HIGH,
-                    verdict=ShieldVerdict.QUARANTINE,
-                    description=f"Mixed-script homoglyph substitution ({len(homoglyphs)} confusable chars)",
-                    evidence=f"Homoglyphs: {homoglyphs[:5]}",
-                    layer=self.LAYER_NAME,
-                    confidence=0.85 if _HAS_CONFUSABLES else 0.70,
-                    suggested_action="Normalize text to ASCII equivalents before processing",
-                    signature_id="UA-HOM",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.UNICODE_SMUGGLING,
+                        level=ThreatLevel.HIGH,
+                        verdict=ShieldVerdict.QUARANTINE,
+                        description=f"Mixed-script homoglyph substitution ({len(homoglyphs)} confusable chars)",
+                        evidence=f"Homoglyphs: {homoglyphs[:5]}",
+                        layer=self.LAYER_NAME,
+                        confidence=0.85 if _HAS_CONFUSABLES else 0.70,
+                        suggested_action="Normalize text to ASCII equivalents before processing",
+                        signature_id="UA-HOM",
+                    )
+                )
 
         # Also check for high Unicode density (general smuggling, not homoglyphs)
         if text:
             non_ascii = sum(1 for c in text if ord(c) > 127)
             density = non_ascii / len(text)
             if density > self._config.max_unicode_density and len(text) > 50:
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.UNICODE_SMUGGLING,
-                    level=ThreatLevel.MEDIUM,
-                    verdict=ShieldVerdict.CHALLENGE,
-                    description=f"High Unicode density ({density:.0%}) in long text",
-                    evidence=f"{non_ascii} non-ASCII chars in {len(text)} total",
-                    layer=self.LAYER_NAME,
-                    confidence=0.60,
-                    suggested_action="Inspect text for encoded payloads",
-                    signature_id="UA-DENSITY",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.UNICODE_SMUGGLING,
+                        level=ThreatLevel.MEDIUM,
+                        verdict=ShieldVerdict.CHALLENGE,
+                        description=f"High Unicode density ({density:.0%}) in long text",
+                        evidence=f"{non_ascii} non-ASCII chars in {len(text)} total",
+                        layer=self.LAYER_NAME,
+                        confidence=0.60,
+                        suggested_action="Inspect text for encoded payloads",
+                        signature_id="UA-DENSITY",
+                    )
+                )
 
         return threats
 
@@ -457,9 +547,7 @@ class PromptArmorLayer:
                         homoglyphs = entry.get("homoglyphs", [])
                         if homoglyphs:
                             latin_equiv = homoglyphs[0].get("c", "?")
-                            found.append(
-                                f"{char}(U+{ord(char):04X},{alias})→{latin_equiv}"
-                            )
+                            found.append(f"{char}(U+{ord(char):04X},{alias})→{latin_equiv}")
                 if len(found) >= 10:  # Cap for performance
                     break
         return found
@@ -467,14 +555,34 @@ class PromptArmorLayer:
     def _detect_homoglyphs_fallback(self, text: str) -> List[str]:
         """Fallback: hardcoded map for most common Cyrillic/Greek/Fullwidth."""
         homoglyph_map = {
-            "\u0430": "a", "\u0435": "e", "\u043e": "o", "\u0440": "p",
-            "\u0441": "c", "\u0443": "y", "\u0445": "x", "\u0456": "i",
-            "\u0458": "j", "\u04bb": "h", "\u04cf": "l",
-            "\u0391": "A", "\u0392": "B", "\u0395": "E", "\u0397": "H",
-            "\u0399": "I", "\u039a": "K", "\u039c": "M", "\u039d": "N",
-            "\u039f": "O", "\u03a1": "P", "\u03a4": "T", "\u03a5": "Y",
-            "\u03a7": "X", "\u0417": "Z",
-            "\uff41": "a", "\uff42": "b", "\uff43": "c",  # Fullwidth
+            "\u0430": "a",
+            "\u0435": "e",
+            "\u043e": "o",
+            "\u0440": "p",
+            "\u0441": "c",
+            "\u0443": "y",
+            "\u0445": "x",
+            "\u0456": "i",
+            "\u0458": "j",
+            "\u04bb": "h",
+            "\u04cf": "l",
+            "\u0391": "A",
+            "\u0392": "B",
+            "\u0395": "E",
+            "\u0397": "H",
+            "\u0399": "I",
+            "\u039a": "K",
+            "\u039c": "M",
+            "\u039d": "N",
+            "\u039f": "O",
+            "\u03a1": "P",
+            "\u03a4": "T",
+            "\u03a5": "Y",
+            "\u03a7": "X",
+            "\u0417": "Z",
+            "\uff41": "a",
+            "\uff42": "b",
+            "\uff43": "c",  # Fullwidth
         }
         found = []
         for char in text:
@@ -492,30 +600,34 @@ class PromptArmorLayer:
         braille_chars = sum(1 for c in text if 0x2800 <= ord(c) <= 0x28FF)
 
         if box_chars > 20:
-            threats.append(ThreatDetection(
-                category=ThreatCategory.ASCII_ART_BYPASS,
-                level=ThreatLevel.MEDIUM,
-                verdict=ShieldVerdict.CHALLENGE,
-                description=f"High density of box-drawing characters ({box_chars})",
-                evidence=f"Box-drawing: {box_chars}, Block: {block_chars}",
-                layer=self.LAYER_NAME,
-                confidence=0.65,
-                suggested_action="Inspect ASCII art for hidden instructions",
-                signature_id="AA-BOX",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.ASCII_ART_BYPASS,
+                    level=ThreatLevel.MEDIUM,
+                    verdict=ShieldVerdict.CHALLENGE,
+                    description=f"High density of box-drawing characters ({box_chars})",
+                    evidence=f"Box-drawing: {box_chars}, Block: {block_chars}",
+                    layer=self.LAYER_NAME,
+                    confidence=0.65,
+                    suggested_action="Inspect ASCII art for hidden instructions",
+                    signature_id="AA-BOX",
+                )
+            )
 
         if braille_chars > 10:
-            threats.append(ThreatDetection(
-                category=ThreatCategory.ASCII_ART_BYPASS,
-                level=ThreatLevel.MEDIUM,
-                verdict=ShieldVerdict.CHALLENGE,
-                description=f"Braille characters detected ({braille_chars})",
-                evidence="Braille pattern chars in text",
-                layer=self.LAYER_NAME,
-                confidence=0.70,
-                suggested_action="Decode braille patterns and check for instructions",
-                signature_id="AA-BRL",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.ASCII_ART_BYPASS,
+                    level=ThreatLevel.MEDIUM,
+                    verdict=ShieldVerdict.CHALLENGE,
+                    description=f"Braille characters detected ({braille_chars})",
+                    evidence="Braille pattern chars in text",
+                    layer=self.LAYER_NAME,
+                    confidence=0.70,
+                    suggested_action="Decode braille patterns and check for instructions",
+                    signature_id="AA-BRL",
+                )
+            )
 
         # Check for large blocks of repeated special characters (figlet/banner patterns)
         lines = text.split("\n")
@@ -527,17 +639,19 @@ class PromptArmorLayer:
                     art_lines += 1
 
         if art_lines > 5:
-            threats.append(ThreatDetection(
-                category=ThreatCategory.ASCII_ART_BYPASS,
-                level=ThreatLevel.LOW,
-                verdict=ShieldVerdict.SANITIZE,
-                description=f"Large ASCII art block detected ({art_lines} lines)",
-                evidence=f"{art_lines} lines with >60% special characters",
-                layer=self.LAYER_NAME,
-                confidence=0.55,
-                suggested_action="Extract text content from ASCII art",
-                signature_id="AA-BLK",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.ASCII_ART_BYPASS,
+                    level=ThreatLevel.LOW,
+                    verdict=ShieldVerdict.SANITIZE,
+                    description=f"Large ASCII art block detected ({art_lines} lines)",
+                    evidence=f"{art_lines} lines with >60% special characters",
+                    layer=self.LAYER_NAME,
+                    confidence=0.55,
+                    suggested_action="Extract text content from ASCII art",
+                    signature_id="AA-BLK",
+                )
+            )
 
         return threats
 
@@ -552,34 +666,38 @@ class PromptArmorLayer:
         )
         b64_match = b64_pattern.search(text)
         if b64_match:
-            threats.append(ThreatDetection(
-                category=ThreatCategory.PROMPT_INJECTION,
-                level=ThreatLevel.HIGH,
-                verdict=ShieldVerdict.QUARANTINE,
-                description="Base64-encoded payload with decode instruction",
-                evidence=b64_match.group(0)[:200],
-                layer=self.LAYER_NAME,
-                confidence=0.80,
-                suggested_action="Do not decode or execute",
-                signature_id="ENC-B64",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.PROMPT_INJECTION,
+                    level=ThreatLevel.HIGH,
+                    verdict=ShieldVerdict.QUARANTINE,
+                    description="Base64-encoded payload with decode instruction",
+                    evidence=b64_match.group(0)[:200],
+                    layer=self.LAYER_NAME,
+                    confidence=0.80,
+                    suggested_action="Do not decode or execute",
+                    signature_id="ENC-B64",
+                )
+            )
 
         # Check for known base64-encoded injection prefixes
         # "ignore" = "aWdub3Jl", "system" = "c3lzdGVt", "override" = "b3ZlcnJpZG"
         known_b64 = ["aWdub3Jl", "c3lzdGVt", "b3ZlcnJpZG", "aW5zdHJ1Y3"]
         for prefix in known_b64:
             if prefix in text:
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.PROMPT_INJECTION,
-                    level=ThreatLevel.HIGH,
-                    verdict=ShieldVerdict.QUARANTINE,
-                    description="Known base64-encoded injection keyword detected",
-                    evidence=f"Found encoded prefix: {prefix}",
-                    layer=self.LAYER_NAME,
-                    confidence=0.75,
-                    suggested_action="Block encoded injection attempt",
-                    signature_id="ENC-KNB",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.PROMPT_INJECTION,
+                        level=ThreatLevel.HIGH,
+                        verdict=ShieldVerdict.QUARANTINE,
+                        description="Known base64-encoded injection keyword detected",
+                        evidence=f"Found encoded prefix: {prefix}",
+                        layer=self.LAYER_NAME,
+                        confidence=0.75,
+                        suggested_action="Block encoded injection attempt",
+                        signature_id="ENC-KNB",
+                    )
+                )
                 break
 
         # === Nested encoding detection ===
@@ -616,20 +734,23 @@ class PromptArmorLayer:
                     # Check if inner decoded contains injection keywords
                     injection_kw = re.search(
                         r"(?:ignore|override|bypass|system|execute|instruction|jailbreak|hack)",
-                        inner_decoded, re.I,
+                        inner_decoded,
+                        re.I,
                     )
                     if injection_kw:
-                        threats.append(ThreatDetection(
-                            category=ThreatCategory.PROMPT_INJECTION,
-                            level=ThreatLevel.CRITICAL,
-                            verdict=ShieldVerdict.BLOCK,
-                            description="Double-base64 encoded injection payload detected",
-                            evidence=f"Decoded: ...{inner_decoded[:100]}...",
-                            layer=self.LAYER_NAME,
-                            confidence=0.90,
-                            suggested_action="Block nested encoding attack",
-                            signature_id="ENC-NEST-B64",
-                        ))
+                        threats.append(
+                            ThreatDetection(
+                                category=ThreatCategory.PROMPT_INJECTION,
+                                level=ThreatLevel.CRITICAL,
+                                verdict=ShieldVerdict.BLOCK,
+                                description="Double-base64 encoded injection payload detected",
+                                evidence=f"Decoded: ...{inner_decoded[:100]}...",
+                                layer=self.LAYER_NAME,
+                                confidence=0.90,
+                                suggested_action="Block nested encoding attack",
+                                signature_id="ENC-NEST-B64",
+                            )
+                        )
                         break
                 except Exception:
                     pass
@@ -643,20 +764,23 @@ class PromptArmorLayer:
                     r"bypass\s+(?:safety|security|filter)|"
                     r"disable\s+(?:all\s+)?(?:safety|filter)|"
                     r"jailbreak\s+mode)",
-                    decoded, re.I,
+                    decoded,
+                    re.I,
                 )
                 if injection_kw:
-                    threats.append(ThreatDetection(
-                        category=ThreatCategory.PROMPT_INJECTION,
-                        level=ThreatLevel.HIGH,
-                        verdict=ShieldVerdict.QUARANTINE,
-                        description="Hidden injection payload in base64 (no decode instruction)",
-                        evidence=f"Decoded content: {injection_kw.group(0)[:100]}",
-                        layer=self.LAYER_NAME,
-                        confidence=0.78,
-                        suggested_action="Block stealth encoded injection",
-                        signature_id="ENC-STEALTH",
-                    ))
+                    threats.append(
+                        ThreatDetection(
+                            category=ThreatCategory.PROMPT_INJECTION,
+                            level=ThreatLevel.HIGH,
+                            verdict=ShieldVerdict.QUARANTINE,
+                            description="Hidden injection payload in base64 (no decode instruction)",
+                            evidence=f"Decoded content: {injection_kw.group(0)[:100]}",
+                            layer=self.LAYER_NAME,
+                            confidence=0.78,
+                            suggested_action="Block stealth encoded injection",
+                            signature_id="ENC-STEALTH",
+                        )
+                    )
                     break
 
         # Check for hex-encoded injection payloads
@@ -667,17 +791,19 @@ class PromptArmorLayer:
                 hex_str = re.sub(r"[\s\\x]|0x", "", hex_match.group(0))
                 decoded_hex = bytes.fromhex(hex_str).decode("utf-8", errors="ignore")
                 if re.search(r"(?:ignore|override|bypass|system|execute|jailbreak)", decoded_hex, re.I):
-                    threats.append(ThreatDetection(
-                        category=ThreatCategory.PROMPT_INJECTION,
-                        level=ThreatLevel.HIGH,
-                        verdict=ShieldVerdict.QUARANTINE,
-                        description="Hex-encoded injection payload detected",
-                        evidence=f"Decoded: {decoded_hex[:100]}",
-                        layer=self.LAYER_NAME,
-                        confidence=0.80,
-                        suggested_action="Block hex-encoded injection",
-                        signature_id="ENC-HEX",
-                    ))
+                    threats.append(
+                        ThreatDetection(
+                            category=ThreatCategory.PROMPT_INJECTION,
+                            level=ThreatLevel.HIGH,
+                            verdict=ShieldVerdict.QUARANTINE,
+                            description="Hex-encoded injection payload detected",
+                            evidence=f"Decoded: {decoded_hex[:100]}",
+                            layer=self.LAYER_NAME,
+                            confidence=0.80,
+                            suggested_action="Block hex-encoded injection",
+                            signature_id="ENC-HEX",
+                        )
+                    )
             except Exception:
                 pass
 
@@ -733,32 +859,36 @@ class PromptArmorLayer:
             if is_rising and esc.transition_count >= 2:
                 self._stats["crescendo_detections"] += 1
                 level = ThreatLevel.HIGH if esc.cumulative >= 20.0 else ThreatLevel.MEDIUM
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.PROMPT_INJECTION,
-                    level=level,
-                    verdict=ShieldVerdict.CHALLENGE if level == ThreatLevel.MEDIUM else ShieldVerdict.QUARANTINE,
-                    description=f"Multi-turn crescendo escalation detected (score={esc.cumulative:.1f}, transitions={esc.transition_count})",
-                    evidence=f"Rising topic scores: {[f'{s:.1f}' for s in recent_3]}, cumulative={esc.cumulative:.1f}",
-                    layer=self.LAYER_NAME,
-                    confidence=0.70 if level == ThreatLevel.MEDIUM else 0.82,
-                    suggested_action="Review conversation trajectory for escalation pattern",
-                    signature_id="PA-CRESCENDO",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.PROMPT_INJECTION,
+                        level=level,
+                        verdict=ShieldVerdict.CHALLENGE if level == ThreatLevel.MEDIUM else ShieldVerdict.QUARANTINE,
+                        description=f"Multi-turn crescendo escalation detected (score={esc.cumulative:.1f}, transitions={esc.transition_count})",
+                        evidence=f"Rising topic scores: {[f'{s:.1f}' for s in recent_3]}, cumulative={esc.cumulative:.1f}",
+                        layer=self.LAYER_NAME,
+                        confidence=0.70 if level == ThreatLevel.MEDIUM else 0.82,
+                        suggested_action="Review conversation trajectory for escalation pattern",
+                        signature_id="PA-CRESCENDO",
+                    )
+                )
 
         # Also check for high cumulative without strict rising pattern
         elif esc.cumulative >= 25.0 and len(esc.scores) >= 5:
             self._stats["crescendo_detections"] += 1
-            threats.append(ThreatDetection(
-                category=ThreatCategory.PROMPT_INJECTION,
-                level=ThreatLevel.HIGH,
-                verdict=ShieldVerdict.QUARANTINE,
-                description=f"Sustained sensitive topic concentration (score={esc.cumulative:.1f})",
-                evidence=f"Scores over {len(esc.scores)} turns, {esc.transition_count} transitions",
-                layer=self.LAYER_NAME,
-                confidence=0.75,
-                suggested_action="Challenge user intent for sustained sensitive queries",
-                signature_id="PA-SUSTAINED",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.PROMPT_INJECTION,
+                    level=ThreatLevel.HIGH,
+                    verdict=ShieldVerdict.QUARANTINE,
+                    description=f"Sustained sensitive topic concentration (score={esc.cumulative:.1f})",
+                    evidence=f"Scores over {len(esc.scores)} turns, {esc.transition_count} transitions",
+                    layer=self.LAYER_NAME,
+                    confidence=0.75,
+                    suggested_action="Challenge user intent for sustained sensitive queries",
+                    signature_id="PA-SUSTAINED",
+                )
+            )
 
         return threats
 
@@ -776,58 +906,65 @@ class PromptArmorLayer:
 
         # Token count estimation (1 token ≈ 4 chars for English)
         if len(text) > 32000:
-            threats.append(ThreatDetection(
-                category=ThreatCategory.PROMPT_INJECTION,
-                level=ThreatLevel.HIGH,
-                verdict=ShieldVerdict.QUARANTINE,
-                description=f"Oversized input may flood context window ({len(text)} chars, ~{len(text)//4} tokens)",
-                evidence=f"Input length: {len(text)} chars",
-                layer=self.LAYER_NAME,
-                confidence=0.80,
-                suggested_action="Truncate or reject oversized input",
-                signature_id="PA-FLOOD-SIZE",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.PROMPT_INJECTION,
+                    level=ThreatLevel.HIGH,
+                    verdict=ShieldVerdict.QUARANTINE,
+                    description=f"Oversized input may flood context window ({len(text)} chars, ~{len(text) // 4} tokens)",
+                    evidence=f"Input length: {len(text)} chars",
+                    layer=self.LAYER_NAME,
+                    confidence=0.80,
+                    suggested_action="Truncate or reject oversized input",
+                    signature_id="PA-FLOOD-SIZE",
+                )
+            )
 
         # Word repetition detection
         if len(text) > 500:
             words = text.lower().split()
             if words:
                 from collections import Counter
+
                 word_counts = Counter(words)
                 most_common_word, most_common_count = word_counts.most_common(1)[0]
                 if most_common_count > 100:
-                    threats.append(ThreatDetection(
-                        category=ThreatCategory.PROMPT_INJECTION,
-                        level=ThreatLevel.HIGH,
-                        verdict=ShieldVerdict.QUARANTINE,
-                        description=f"Word repetition flooding: '{most_common_word}' repeated {most_common_count}x",
-                        evidence=f"'{most_common_word}' x{most_common_count}",
-                        layer=self.LAYER_NAME,
-                        confidence=0.85,
-                        suggested_action="Reject repetitive flooding input",
-                        signature_id="PA-FLOOD-REPEAT",
-                    ))
+                    threats.append(
+                        ThreatDetection(
+                            category=ThreatCategory.PROMPT_INJECTION,
+                            level=ThreatLevel.HIGH,
+                            verdict=ShieldVerdict.QUARANTINE,
+                            description=f"Word repetition flooding: '{most_common_word}' repeated {most_common_count}x",
+                            evidence=f"'{most_common_word}' x{most_common_count}",
+                            layer=self.LAYER_NAME,
+                            confidence=0.85,
+                            suggested_action="Reject repetitive flooding input",
+                            signature_id="PA-FLOOD-REPEAT",
+                        )
+                    )
 
         # Copy-paste block detection (100-char chunk repeated 10+ times)
         if len(text) > 1000:
             chunk_size = 100
             chunks: Dict[str, int] = {}
             for i in range(0, len(text) - chunk_size + 1, chunk_size // 2):
-                chunk = text[i:i + chunk_size]
+                chunk = text[i : i + chunk_size]
                 chunks[chunk] = chunks.get(chunk, 0) + 1
             max_chunk_count = max(chunks.values()) if chunks else 0
             if max_chunk_count > 10:
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.PROMPT_INJECTION,
-                    level=ThreatLevel.HIGH,
-                    verdict=ShieldVerdict.QUARANTINE,
-                    description=f"Copy-paste block repeated {max_chunk_count}x (context flooding)",
-                    evidence=f"100-char block repeated {max_chunk_count} times",
-                    layer=self.LAYER_NAME,
-                    confidence=0.85,
-                    suggested_action="Reject copy-paste flooding",
-                    signature_id="PA-FLOOD-COPYPASTE",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.PROMPT_INJECTION,
+                        level=ThreatLevel.HIGH,
+                        verdict=ShieldVerdict.QUARANTINE,
+                        description=f"Copy-paste block repeated {max_chunk_count}x (context flooding)",
+                        evidence=f"100-char block repeated {max_chunk_count} times",
+                        layer=self.LAYER_NAME,
+                        confidence=0.85,
+                        suggested_action="Reject copy-paste flooding",
+                        signature_id="PA-FLOOD-COPYPASTE",
+                    )
+                )
 
         return threats
 
@@ -848,30 +985,34 @@ class PromptArmorLayer:
 
         # High density = likely poisoning
         if total_matches >= 4 and len(text) < 1000:
-            threats.append(ThreatDetection(
-                category=ThreatCategory.PROMPT_INJECTION,
-                level=ThreatLevel.HIGH,
-                verdict=ShieldVerdict.QUARANTINE,
-                description=f"Few-shot poisoning: {total_matches} role labels in {len(text)} chars",
-                evidence=f"{total_matches} conversation role markers in short text",
-                layer=self.LAYER_NAME,
-                confidence=0.85,
-                suggested_action="Block fake conversation formatting",
-                signature_id="PA-FEWSHOT",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.PROMPT_INJECTION,
+                    level=ThreatLevel.HIGH,
+                    verdict=ShieldVerdict.QUARANTINE,
+                    description=f"Few-shot poisoning: {total_matches} role labels in {len(text)} chars",
+                    evidence=f"{total_matches} conversation role markers in short text",
+                    layer=self.LAYER_NAME,
+                    confidence=0.85,
+                    suggested_action="Block fake conversation formatting",
+                    signature_id="PA-FEWSHOT",
+                )
+            )
         elif total_matches >= 6:
             # Even in longer text, 6+ role labels is suspicious
-            threats.append(ThreatDetection(
-                category=ThreatCategory.PROMPT_INJECTION,
-                level=ThreatLevel.MEDIUM,
-                verdict=ShieldVerdict.CHALLENGE,
-                description=f"Possible few-shot poisoning: {total_matches} role labels detected",
-                evidence=f"{total_matches} conversation role markers",
-                layer=self.LAYER_NAME,
-                confidence=0.70,
-                suggested_action="Review for injected conversation formatting",
-                signature_id="PA-FEWSHOT-LONG",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.PROMPT_INJECTION,
+                    level=ThreatLevel.MEDIUM,
+                    verdict=ShieldVerdict.CHALLENGE,
+                    description=f"Possible few-shot poisoning: {total_matches} role labels detected",
+                    evidence=f"{total_matches} conversation role markers",
+                    layer=self.LAYER_NAME,
+                    confidence=0.70,
+                    suggested_action="Review for injected conversation formatting",
+                    signature_id="PA-FEWSHOT-LONG",
+                )
+            )
 
         return threats
 
@@ -893,17 +1034,19 @@ class PromptArmorLayer:
             seq = special_seq.group(0)
             # Exclude common patterns: URLs, file paths, markdown
             if not re.match(r"^[-=_*#/\\:.]+$", seq):
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.PROMPT_INJECTION,
-                    level=ThreatLevel.MEDIUM,
-                    verdict=ShieldVerdict.CHALLENGE,
-                    description=f"Long special character sequence ({len(seq)} chars)",
-                    evidence=seq[:100],
-                    layer=self.LAYER_NAME,
-                    confidence=0.65,
-                    suggested_action="Inspect anomalous character sequence",
-                    signature_id="PA-GLITCH-SPECIAL",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.PROMPT_INJECTION,
+                        level=ThreatLevel.MEDIUM,
+                        verdict=ShieldVerdict.CHALLENGE,
+                        description=f"Long special character sequence ({len(seq)} chars)",
+                        evidence=seq[:100],
+                        layer=self.LAYER_NAME,
+                        confidence=0.65,
+                        suggested_action="Inspect anomalous character sequence",
+                        signature_id="PA-GLITCH-SPECIAL",
+                    )
+                )
 
         # Shannon entropy per word
         words = text.split()
@@ -924,17 +1067,19 @@ class PromptArmorLayer:
                 high_entropy_words.append((word, entropy))
 
         if len(high_entropy_words) >= 3:
-            threats.append(ThreatDetection(
-                category=ThreatCategory.PROMPT_INJECTION,
-                level=ThreatLevel.MEDIUM,
-                verdict=ShieldVerdict.CHALLENGE,
-                description=f"Multiple high-entropy tokens detected ({len(high_entropy_words)} words, avg entropy {sum(e for _, e in high_entropy_words)/len(high_entropy_words):.1f})",
-                evidence=f"Words: {[w[:20] for w, _ in high_entropy_words[:5]]}",
-                layer=self.LAYER_NAME,
-                confidence=0.65,
-                suggested_action="Inspect anomalous token patterns (possible GlitchMiner attack)",
-                signature_id="PA-GLITCH-ENTROPY",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.PROMPT_INJECTION,
+                    level=ThreatLevel.MEDIUM,
+                    verdict=ShieldVerdict.CHALLENGE,
+                    description=f"Multiple high-entropy tokens detected ({len(high_entropy_words)} words, avg entropy {sum(e for _, e in high_entropy_words) / len(high_entropy_words):.1f})",
+                    evidence=f"Words: {[w[:20] for w, _ in high_entropy_words[:5]]}",
+                    layer=self.LAYER_NAME,
+                    confidence=0.65,
+                    suggested_action="Inspect anomalous token patterns (possible GlitchMiner attack)",
+                    signature_id="PA-GLITCH-ENTROPY",
+                )
+            )
 
         return threats
 
@@ -967,17 +1112,19 @@ class PromptArmorLayer:
         for pattern in _DOC_EMBED_PATTERNS:
             match = pattern.search(text)
             if match:
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.INDIRECT_INJECTION,
-                    level=ThreatLevel.HIGH,
-                    verdict=ShieldVerdict.QUARANTINE,
-                    description=f"Hidden content via CSS: {match.group(0)[:60]}",
-                    evidence=match.group(0)[:200],
-                    layer=self.LAYER_NAME,
-                    confidence=0.85,
-                    suggested_action="Strip hidden HTML/CSS content before processing",
-                    signature_id="PA-EMBED-CSS",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.INDIRECT_INJECTION,
+                        level=ThreatLevel.HIGH,
+                        verdict=ShieldVerdict.QUARANTINE,
+                        description=f"Hidden content via CSS: {match.group(0)[:60]}",
+                        evidence=match.group(0)[:200],
+                        layer=self.LAYER_NAME,
+                        confidence=0.85,
+                        suggested_action="Strip hidden HTML/CSS content before processing",
+                        signature_id="PA-EMBED-CSS",
+                    )
+                )
                 break  # One match is enough to flag
 
         return threats
@@ -1017,11 +1164,7 @@ class PromptArmorLayer:
         elif source in ("brain", "brain_thought", "cognitive_stream"):
             trust = "semi-trusted"
 
-        return (
-            f"<EXTERNAL_CONTENT source=\"{source}\" trust=\"{trust}\">\n"
-            f"{content}\n"
-            f"</EXTERNAL_CONTENT>"
-        )
+        return f'<EXTERNAL_CONTENT source="{source}" trust="{trust}">\n{content}\n</EXTERNAL_CONTENT>'
 
     def get_stats(self) -> Dict:
         """Return layer statistics."""

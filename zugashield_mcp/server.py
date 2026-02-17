@@ -37,6 +37,7 @@ try:
     from mcp.server import Server
     from mcp.server.stdio import stdio_server
     from mcp.types import TextContent, Tool
+
     _HAS_MCP = True
 except ImportError:
     _HAS_MCP = False
@@ -69,9 +70,7 @@ def _decision_to_dict(decision) -> Dict[str, Any]:
 def create_server() -> "Server":
     """Create and configure the MCP server."""
     if not _HAS_MCP:
-        raise ImportError(
-            "MCP SDK is required. Install with: pip install zugashield[mcp]"
-        )
+        raise ImportError("MCP SDK is required. Install with: pip install zugashield[mcp]")
 
     server = Server("zugashield")
     shield = ZugaShield()
@@ -261,10 +260,12 @@ def create_server() -> "Server":
 
         except Exception as e:
             logger.error("[ZugaShield MCP] Error in %s: %s", name, e)
-            return [TextContent(
-                type="text",
-                text=json.dumps({"error": str(e)}),
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps({"error": str(e)}),
+                )
+            ]
 
     return server
 

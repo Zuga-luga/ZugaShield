@@ -60,10 +60,20 @@ class ShieldConfig:
 
     # Tool guard
     tool_rate_limit: int = 30  # Global calls per minute
-    sensitive_paths: list = field(default_factory=lambda: [
-        ".ssh", ".env", ".git/config", "credentials", "secrets",
-        "id_rsa", "id_ed25519", ".aws", ".kube", "token",
-    ])
+    sensitive_paths: list = field(
+        default_factory=lambda: [
+            ".ssh",
+            ".env",
+            ".git/config",
+            "credentials",
+            "secrets",
+            "id_rsa",
+            "id_ed25519",
+            ".aws",
+            ".kube",
+            "token",
+        ]
+    )
 
     # Anomaly detector
     anomaly_threshold: float = 60.0  # Score 0-100
@@ -111,11 +121,16 @@ class ShieldConfig:
             "[ZugaShield] Config loaded: enabled=%s, strict=%s, layers=%s",
             config.enabled,
             config.strict_mode,
-            sum([
-                config.perimeter_enabled, config.prompt_armor_enabled,
-                config.tool_guard_enabled, config.memory_sentinel_enabled,
-                config.exfiltration_guard_enabled, config.anomaly_detector_enabled,
-                config.wallet_fortress_enabled,
-            ]),
+            sum(
+                [
+                    config.perimeter_enabled,
+                    config.prompt_armor_enabled,
+                    config.tool_guard_enabled,
+                    config.memory_sentinel_enabled,
+                    config.exfiltration_guard_enabled,
+                    config.anomaly_detector_enabled,
+                    config.wallet_fortress_enabled,
+                ]
+            ),
         )
         return config

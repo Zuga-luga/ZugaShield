@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 # Optional anthropic import
 try:
     import anthropic
+
     _HAS_ANTHROPIC = True
 except ImportError:
     anthropic = None
@@ -71,7 +72,7 @@ class LLMJudgeLayer:
 
     def __init__(self, config: ShieldConfig) -> None:
         self._config = config
-        self._enabled = getattr(config, 'llm_judge_enabled', False)
+        self._enabled = getattr(config, "llm_judge_enabled", False)
         self._client = None
         self._stats = {"checks": 0, "escalations": 0, "blocks": 0, "errors": 0}
 
@@ -141,7 +142,8 @@ class LLMJudgeLayer:
                 self._stats["blocks"] += 1
                 return ShieldDecision(
                     verdict=ShieldVerdict.BLOCK,
-                    threats_detected=fast_decision.threats_detected + [
+                    threats_detected=fast_decision.threats_detected
+                    + [
                         ThreatDetection(
                             category=ThreatCategory.PROMPT_INJECTION,
                             level=ThreatLevel.HIGH,

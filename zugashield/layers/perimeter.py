@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 # Sensitive endpoints with stricter rate limits
 _SENSITIVE_ENDPOINTS = {
-    "/api/chat/message": 20,       # messages per minute
+    "/api/chat/message": 20,  # messages per minute
     "/api/brain/actions": 10,
     "/api/brain/start": 5,
     "/api/admin/": 10,
@@ -58,9 +58,7 @@ class PerimeterLayer:
         self._config = config
         self._catalog = catalog
         # Rate tracking: {client_id: {endpoint: deque of timestamps}}
-        self._rate_tracker: Dict[str, Dict[str, deque]] = defaultdict(
-            lambda: defaultdict(lambda: deque(maxlen=200))
-        )
+        self._rate_tracker: Dict[str, Dict[str, deque]] = defaultdict(lambda: defaultdict(lambda: deque(maxlen=200)))
         self._stats = {"checks": 0, "blocked": 0, "rate_limits": 0, "oversized": 0}
 
     async def check(
@@ -93,17 +91,19 @@ class PerimeterLayer:
         # === Check 1: Request size ===
         if content_length > self._config.max_message_size:
             self._stats["oversized"] += 1
-            threats.append(ThreatDetection(
-                category=ThreatCategory.PROMPT_INJECTION,
-                level=ThreatLevel.MEDIUM,
-                verdict=ShieldVerdict.BLOCK,
-                description=f"Oversized request: {content_length} bytes (max: {self._config.max_message_size})",
-                evidence=f"Content-Length: {content_length}",
-                layer=self.LAYER_NAME,
-                confidence=0.95,
-                suggested_action="Reject oversized request",
-                signature_id="PM-SIZE",
-            ))
+            threats.append(
+                ThreatDetection(
+                    category=ThreatCategory.PROMPT_INJECTION,
+                    level=ThreatLevel.MEDIUM,
+                    verdict=ShieldVerdict.BLOCK,
+                    description=f"Oversized request: {content_length} bytes (max: {self._config.max_message_size})",
+                    evidence=f"Content-Length: {content_length}",
+                    layer=self.LAYER_NAME,
+                    confidence=0.95,
+                    suggested_action="Reject oversized request",
+                    signature_id="PM-SIZE",
+                )
+            )
 
         # === Check 2: Endpoint rate limiting ===
         rate_threat = self._check_endpoint_rate(path, client_ip)
@@ -125,10 +125,16 @@ class PerimeterLayer:
         if not threats:
             return allow_decision(self.LAYER_NAME, elapsed)
 
-        max_threat = max(threats, key=lambda t: [
-            ThreatLevel.NONE, ThreatLevel.LOW, ThreatLevel.MEDIUM,
-            ThreatLevel.HIGH, ThreatLevel.CRITICAL,
-        ].index(t.level))
+        max_threat = max(
+            threats,
+            key=lambda t: [
+                ThreatLevel.NONE,
+                ThreatLevel.LOW,
+                ThreatLevel.MEDIUM,
+                ThreatLevel.HIGH,
+                ThreatLevel.CRITICAL,
+            ].index(t.level),
+        )
 
         verdict = ShieldVerdict.BLOCK if max_threat.level >= ThreatLevel.HIGH else ShieldVerdict.CHALLENGE
         if verdict == ShieldVerdict.BLOCK:
@@ -136,8 +142,11 @@ class PerimeterLayer:
 
         logger.warning(
             "[Perimeter] %s %s from %s: %s (%.1fms)",
-            verdict.value.upper(), path, client_ip,
-            threats[0].description, elapsed,
+            verdict.value.upper(),
+            path,
+            client_ip,
+            threats[0].description,
+            elapsed,
         )
 
         return ShieldDecision(
@@ -187,17 +196,19 @@ class PerimeterLayer:
             # Check for non-ASCII in header values (potential smuggling)
             non_ascii = sum(1 for c in value if ord(c) > 127)
             if non_ascii > 0 and name.lower() not in ("cookie", "user-agent", "accept-language"):
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.UNICODE_SMUGGLING,
-                    level=ThreatLevel.LOW,
-                    verdict=ShieldVerdict.SANITIZE,
-                    description=f"Non-ASCII characters in header: {name}",
-                    evidence=f"{name}: {value[:100]}",
-                    layer=self.LAYER_NAME,
-                    confidence=0.60,
-                    suggested_action="Normalize header value",
-                    signature_id="PM-HDR",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.UNICODE_SMUGGLING,
+                        level=ThreatLevel.LOW,
+                        verdict=ShieldVerdict.SANITIZE,
+                        description=f"Non-ASCII characters in header: {name}",
+                        evidence=f"{name}: {value[:100]}",
+                        layer=self.LAYER_NAME,
+                        confidence=0.60,
+                        suggested_action="Normalize header value",
+                        signature_id="PM-HDR",
+                    )
+                )
         return threats
 
     def _check_body_encoding(self, body: str) -> List[ThreatDetection]:
@@ -209,17 +220,19 @@ class PerimeterLayer:
             non_ascii = sum(1 for c in body if ord(c) > 127)
             density = non_ascii / len(body)
             if density > self._config.max_unicode_density:
-                threats.append(ThreatDetection(
-                    category=ThreatCategory.UNICODE_SMUGGLING,
-                    level=ThreatLevel.LOW,
-                    verdict=ShieldVerdict.SANITIZE,
-                    description=f"High Unicode density in request body: {density:.1%}",
-                    evidence=f"{non_ascii}/{len(body)} non-ASCII chars",
-                    layer=self.LAYER_NAME,
-                    confidence=0.55,
-                    suggested_action="Inspect for Unicode smuggling",
-                    signature_id="PM-UNI",
-                ))
+                threats.append(
+                    ThreatDetection(
+                        category=ThreatCategory.UNICODE_SMUGGLING,
+                        level=ThreatLevel.LOW,
+                        verdict=ShieldVerdict.SANITIZE,
+                        description=f"High Unicode density in request body: {density:.1%}",
+                        evidence=f"{non_ascii}/{len(body)} non-ASCII chars",
+                        layer=self.LAYER_NAME,
+                        confidence=0.55,
+                        suggested_action="Inspect for Unicode smuggling",
+                        signature_id="PM-UNI",
+                    )
+                )
 
         return threats
 

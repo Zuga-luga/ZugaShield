@@ -5,6 +5,7 @@ import pytest
 # Only test MCP if the SDK is installed
 try:
     from zugashield_mcp.server import create_server
+
     _HAS_MCP = True
 except ImportError:
     _HAS_MCP = False

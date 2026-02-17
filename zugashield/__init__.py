@@ -102,12 +102,17 @@ class ZugaShield:
         logger.info(
             "[ZugaShield] Initialized: %d signatures loaded, %d layers active",
             self._catalog._total_signatures,
-            sum([
-                self._config.perimeter_enabled, self._config.prompt_armor_enabled,
-                self._config.tool_guard_enabled, self._config.memory_sentinel_enabled,
-                self._config.exfiltration_guard_enabled, self._config.anomaly_detector_enabled,
-                self._config.wallet_fortress_enabled,
-            ]),
+            sum(
+                [
+                    self._config.perimeter_enabled,
+                    self._config.prompt_armor_enabled,
+                    self._config.tool_guard_enabled,
+                    self._config.memory_sentinel_enabled,
+                    self._config.exfiltration_guard_enabled,
+                    self._config.anomaly_detector_enabled,
+                    self._config.wallet_fortress_enabled,
+                ]
+            ),
         )
 
     @property
@@ -144,8 +149,12 @@ class ZugaShield:
             return allow_decision("shield_disabled")
 
         decision = await self.perimeter.check(
-            path=path, method=method, content_length=content_length,
-            body=body, headers=headers, client_ip=client_ip,
+            path=path,
+            method=method,
+            content_length=content_length,
+            body=body,
+            headers=headers,
+            client_ip=client_ip,
         )
         self._audit.log(decision, {"path": path, "method": method, "client_ip": client_ip})
         self._feed_anomaly(decision)
@@ -211,8 +220,12 @@ class ZugaShield:
             return allow_decision("shield_disabled")
 
         decision = await self.memory_sentinel.check_write(
-            content=content, memory_type=memory_type, importance=importance,
-            source=source, user_id=user_id, tags=tags,
+            content=content,
+            memory_type=memory_type,
+            importance=importance,
+            source=source,
+            user_id=user_id,
+            tags=tags,
         )
         self._audit.log(decision, {"source": source, "memory_type": memory_type})
         self._feed_anomaly(decision)
@@ -245,7 +258,9 @@ class ZugaShield:
             return allow_decision("shield_disabled")
 
         decision = await self.memory_sentinel.check_document(
-            content=content, source=source, document_type=document_type,
+            content=content,
+            source=source,
+            document_type=document_type,
         )
         self._audit.log(decision, {"source": source, "document_type": document_type})
         self._feed_anomaly(decision)
@@ -285,8 +300,10 @@ class ZugaShield:
             return allow_decision("shield_disabled")
 
         decision = await self.multimodal.check_image(
-            image_path=image_path, alt_text=alt_text,
-            ocr_text=ocr_text, metadata=metadata,
+            image_path=image_path,
+            alt_text=alt_text,
+            ocr_text=ocr_text,
+            metadata=metadata,
         )
         self._audit.log(decision, {"source": "image"})
         self._feed_anomaly(decision)
@@ -310,8 +327,11 @@ class ZugaShield:
             return allow_decision("shield_disabled")
 
         decision = await self.wallet_fortress.check(
-            tx_type=tx_type, to_address=to_address, amount=amount,
-            amount_usd=amount_usd, contract_data=contract_data,
+            tx_type=tx_type,
+            to_address=to_address,
+            amount=amount,
+            amount_usd=amount_usd,
+            contract_data=contract_data,
             function_sig=function_sig,
         )
         self._audit.log(decision, {"tx_type": tx_type, "amount_usd": amount_usd})
@@ -390,9 +410,7 @@ class ZugaShield:
             schema = tool.get("input_schema", {})
             for param_name, param_def in schema.get("properties", {}).items():
                 if "description" in param_def:
-                    texts_to_scan.append(
-                        (f"param:{param_name}", param_def["description"])
-                    )
+                    texts_to_scan.append((f"param:{param_name}", param_def["description"]))
 
             for field_name, text in texts_to_scan:
                 for pattern, desc in [
@@ -425,7 +443,9 @@ class ZugaShield:
                         )
                         logger.warning(
                             "[ZugaShield] BLOCKED poisoned tool definition: %s (field=%s, match=%s)",
-                            tool_name, field_name, match.group(0)[:80],
+                            tool_name,
+                            field_name,
+                            match.group(0)[:80],
                         )
                         break
                 if flagged:
@@ -438,7 +458,8 @@ class ZugaShield:
         if removed:
             logger.warning(
                 "[ZugaShield] Removed %d poisoned tool definition(s) from %d total",
-                removed, len(tools),
+                removed,
+                len(tools),
             )
 
         return clean_tools
@@ -465,7 +486,7 @@ class ZugaShield:
                 "wallet_fortress": self._config.wallet_fortress_enabled,
             },
             "config": {
-                "fail_open": self._config.fail_open if hasattr(self._config, 'fail_open') else True,
+                "fail_open": self._config.fail_open if hasattr(self._config, "fail_open") else True,
             },
         }
 
