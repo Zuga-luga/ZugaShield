@@ -1,0 +1,41 @@
+name: New Signature Request
+description: Suggest a new threat signature or detection pattern
+title: "[SIG] "
+labels: ["signature", "enhancement"]
+body:
+  - type: dropdown
+    id: category
+    attributes:
+      label: Threat category
+      options:
+        - Prompt Injection
+        - Tool Exploitation
+        - Memory Poisoning
+        - Data Exfiltration
+        - Unicode Smuggling
+        - Wallet Attacks
+        - New category needed
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Attack description
+      description: Describe the attack pattern this signature should detect
+    validations:
+      required: true
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Example payloads
+      description: 2-3 example inputs that demonstrate the attack
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Links to research papers, blog posts, or CVEs

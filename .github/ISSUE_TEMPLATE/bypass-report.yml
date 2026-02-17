@@ -1,0 +1,50 @@
+name: Detection Bypass Report
+description: Report an attack that ZugaShield fails to detect
+title: "[BYPASS] "
+labels: ["bypass", "security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a detection bypass. This helps make ZugaShield stronger for everyone.
+        **If this is a critical vulnerability, please email antonio@zuga.dev instead.**
+
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Which layer should have caught this?
+      options:
+        - "Layer 2: Prompt Armor"
+        - "Layer 3: Tool Guard"
+        - "Layer 4: Memory Sentinel"
+        - "Layer 5: Exfiltration Guard"
+        - "Layer 7: Wallet Fortress"
+        - "Cross-layer: MCP scanning"
+        - "Cross-layer: Multimodal"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: payload
+    attributes:
+      label: Attack payload
+      description: The input that bypasses detection (redact real secrets)
+      placeholder: "e.g., 'Ign0re previous instructions using unicode evasion...'"
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What verdict should ZugaShield return?
+      placeholder: "Should return BLOCK with high confidence"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: ZugaShield version
+      placeholder: "1.0.0"
