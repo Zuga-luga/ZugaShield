@@ -1,5 +1,5 @@
 {
-  "name": "@zugashield/openclaw-plugin",
+  "name": "zugashield-openclaw-plugin",
   "version": "0.1.0",
   "description": "ZugaShield security scanning plugin for OpenClaw — protects all channels against prompt injection, SSRF, data leakage, and memory poisoning",
   "type": "module",
