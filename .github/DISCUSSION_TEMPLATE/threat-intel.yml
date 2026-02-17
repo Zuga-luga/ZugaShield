@@ -1,0 +1,40 @@
+title: "[Threat] "
+labels:
+  - research
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share new attack techniques, research papers, or CVEs that ZugaShield should defend against.
+        This is for discussion — if you have a working bypass, please use a [Bypass Report](https://github.com/Zuga-luga/ZugaShield/issues/new?template=bypass-report.yml) instead.
+
+  - type: textarea
+    id: threat
+    attributes:
+      label: Threat description
+      description: What is the attack or vulnerability?
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Links to papers, blog posts, CVEs, or proof-of-concept code
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Threat category
+      options:
+        - Prompt Injection
+        - Tool/MCP Poisoning
+        - RAG/Memory Poisoning
+        - Data Exfiltration
+        - Multi-Agent Attacks
+        - AI Worms / Self-Replicating
+        - Supply Chain (Model Weights)
+        - Multimodal (Image/Audio/Video)
+        - Other / New Category

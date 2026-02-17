@@ -1,0 +1,18 @@
+# ZugaShield Code Owners
+# These owners will be requested for review on PRs touching their areas.
+
+# Global fallback — all PRs need review from maintainer
+* @Zuga-luga
+
+# Core detection layers — security-critical
+/zugashield/layers/ @Zuga-luga
+
+# Signature files — community contributions welcome, but need review
+/zugashield/signatures/ @Zuga-luga
+
+# MCP server
+/zugashield_mcp/ @Zuga-luga
+
+# CI/CD and build
+/.github/ @Zuga-luga
+/pyproject.toml @Zuga-luga

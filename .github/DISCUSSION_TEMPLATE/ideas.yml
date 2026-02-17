@@ -1,0 +1,36 @@
+title: "[Idea] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share your ideas for new detection strategies, integrations, or improvements.
+        For specific bug reports, please use [Issues](https://github.com/Zuga-luga/ZugaShield/issues) instead.
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What would you like to see in ZugaShield?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why is this useful? What attack does it defend against?
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - New detection layer
+        - Signature improvement
+        - MCP server
+        - Integration (LangChain, LlamaIndex, etc.)
+        - Performance
+        - Documentation
+        - Other
