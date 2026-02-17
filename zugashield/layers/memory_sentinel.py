@@ -57,6 +57,15 @@ _INSTRUCTION_PATTERNS = [
     re.compile(r"(?:SYSTEM|ADMIN|ROOT)\s*(?:UPDATE|OVERRIDE|COMMAND|DIRECTIVE)\s*:", re.I),
 ]
 
+# CSS/HTML hiding patterns for document embedding poisoning
+_DOC_CSS_HIDE_PATTERNS = [
+    re.compile(r"font-size\s*:\s*0", re.I),
+    re.compile(r"display\s*:\s*none", re.I),
+    re.compile(r"visibility\s*:\s*hidden", re.I),
+    re.compile(r"opacity\s*:\s*0(?:\.0+)?\s*[;}]", re.I),
+    re.compile(r"(?:height|width)\s*:\s*[01]px", re.I),
+]
+
 # Importance inflation patterns
 _INFLATION_PATTERNS = [
     re.compile(r"(?:critically?\s+)?import(?:ant|ance)\s*[:=]\s*(?:critical|highest|maximum|10|1\.0)", re.I),
@@ -394,7 +403,27 @@ class MemorySentinelLayer:
                 )
                 break
 
-        # === Check 2: System command density ===
+        # === Check 2: CSS/HTML hiding (invisible injections) ===
+        if "<" in content and ">" in content:
+            for pattern in _DOC_CSS_HIDE_PATTERNS:
+                match = pattern.search(content)
+                if match:
+                    threats.append(
+                        ThreatDetection(
+                            category=ThreatCategory.INDIRECT_INJECTION,
+                            level=ThreatLevel.HIGH,
+                            verdict=ShieldVerdict.QUARANTINE,
+                            description=f"Hidden content via CSS in document: {match.group(0)[:60]}",
+                            evidence=match.group(0)[:200],
+                            layer=self.LAYER_NAME,
+                            confidence=0.85,
+                            suggested_action="Strip hidden HTML/CSS content before ingestion",
+                            signature_id="MS-DOC-CSS-HIDE",
+                        )
+                    )
+                    break
+
+        # === Check 3: System command density ===
         command_patterns = re.findall(
             r"(?:sudo|chmod|chown|rm\s+-rf|curl\s+.*?\|\s*(?:bash|sh)|wget\s+.*?\|\s*(?:bash|sh)|eval\s*\(|exec\s*\()",
             content,
