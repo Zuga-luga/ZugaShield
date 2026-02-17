@@ -53,6 +53,8 @@ _INSTRUCTION_PATTERNS = [
     re.compile(r"(?:secret|hidden)\s+(?:instruction|command|directive|task)", re.I),
     re.compile(r"(?:do\s+not|never)\s+(?:tell|reveal|show|mention)\s+(?:the\s+user|anyone|antonio)", re.I),
     re.compile(r"(?:sleeper|dormant|delayed|trigger)\s+(?:instruction|command|payload|action)", re.I),
+    re.compile(r"(?:transfer|send|move|wire)\s+(?:all\s+)?(?:funds?|money|balance|assets|crypto|bitcoin)", re.I),
+    re.compile(r"(?:SYSTEM|ADMIN|ROOT)\s*(?:UPDATE|OVERRIDE|COMMAND|DIRECTIVE)\s*:", re.I),
 ]
 
 # Importance inflation patterns

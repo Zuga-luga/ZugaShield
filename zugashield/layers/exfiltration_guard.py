@@ -225,9 +225,15 @@ class ExfiltrationGuardLayer:
         if not threats:
             return allow_decision(self.LAYER_NAME, elapsed)
 
-        # Determine verdict
+        # Determine verdict — escalate based on max threat level
         has_critical = any(t.level == ThreatLevel.CRITICAL for t in threats)
-        verdict = ShieldVerdict.BLOCK if has_critical else ShieldVerdict.SANITIZE
+        has_high = any(t.level == ThreatLevel.HIGH for t in threats)
+        if has_critical:
+            verdict = ShieldVerdict.BLOCK
+        elif has_high:
+            verdict = ShieldVerdict.QUARANTINE
+        else:
+            verdict = ShieldVerdict.SANITIZE
         sanitized = self._redact_output(output, threats) if verdict == ShieldVerdict.SANITIZE else None
 
         if verdict == ShieldVerdict.BLOCK:
