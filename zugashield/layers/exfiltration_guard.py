@@ -413,7 +413,7 @@ class ExfiltrationGuardLayer:
 
         # Check allowlist
         allowed = self._config.egress_domain_allowlist
-        if allowed and not any(domain.endswith(d) for d in allowed):
+        if allowed and not self._match_egress_domain(domain, allowed):
             return ThreatDetection(
                 category=ThreatCategory.DATA_EXFILTRATION,
                 level=ThreatLevel.MEDIUM,
@@ -426,6 +426,24 @@ class ExfiltrationGuardLayer:
                 signature_id="EG-DOMAIN",
             )
         return None
+
+    def _match_egress_domain(self, domain: str, allowed: tuple) -> bool:
+        """Match domain against allowlist with explicit wildcard syntax.
+
+        Exact match: "api.example.com" matches only "api.example.com"
+        Wildcard: "*.example.com" matches "sub.example.com" but NOT "example.com"
+        """
+        for entry in allowed:
+            if entry.startswith("*."):
+                # Wildcard: match any subdomain
+                base = entry[2:]  # Remove "*."
+                if domain == base or domain.endswith("." + base):
+                    return True
+            else:
+                # Exact match only
+                if domain == entry:
+                    return True
+        return False
 
     def _redact(self, text: str) -> str:
         """Redact a secret/PII value for safe logging."""

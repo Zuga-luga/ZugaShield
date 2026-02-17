@@ -106,6 +106,9 @@ class AnomalyDetectorLayer:
         score.session_score = min(100, score.session_score + contribution)
         score.contributing_events.append(detection)
 
+        # Non-decaying lifetime score (Fix #9)
+        score.cumulative_score = max(score.cumulative_score, score.session_score * 0.2)
+
         # Keep contributing events bounded
         if len(score.contributing_events) > 50:
             score.contributing_events = score.contributing_events[-50:]
@@ -126,6 +129,9 @@ class AnomalyDetectorLayer:
 
         # Apply decay
         score.session_score *= score.decay_rate
+
+        # Lifetime floor: never decay below 20% of peak (Fix #9)
+        score.session_score = max(score.session_score, score.cumulative_score)
 
         # === Check 1: Chain attack patterns ===
         chain_threats = self._check_chains(session_id)

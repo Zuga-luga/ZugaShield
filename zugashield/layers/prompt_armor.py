@@ -553,36 +553,77 @@ class PromptArmorLayer:
         return found
 
     def _detect_homoglyphs_fallback(self, text: str) -> List[str]:
-        """Fallback: hardcoded map for most common Cyrillic/Greek/Fullwidth."""
+        """Expanded fallback: ~200 common confusables (Fix #10).
+
+        Covers Cyrillic, Greek, Armenian, Cherokee, Fullwidth Latin,
+        Latin Extended/IPA, and mathematical alphanumeric symbols.
+        For full TR39 coverage: pip install zugashield[homoglyphs]
+        """
         homoglyph_map = {
-            "\u0430": "a",
-            "\u0435": "e",
-            "\u043e": "o",
-            "\u0440": "p",
-            "\u0441": "c",
-            "\u0443": "y",
-            "\u0445": "x",
-            "\u0456": "i",
-            "\u0458": "j",
-            "\u04bb": "h",
-            "\u04cf": "l",
-            "\u0391": "A",
-            "\u0392": "B",
-            "\u0395": "E",
-            "\u0397": "H",
-            "\u0399": "I",
-            "\u039a": "K",
-            "\u039c": "M",
-            "\u039d": "N",
-            "\u039f": "O",
-            "\u03a1": "P",
-            "\u03a4": "T",
-            "\u03a5": "Y",
-            "\u03a7": "X",
-            "\u0417": "Z",
-            "\uff41": "a",
-            "\uff42": "b",
-            "\uff43": "c",  # Fullwidth
+            # Cyrillic lowercase
+            "\u0430": "a", "\u0435": "e", "\u043e": "o", "\u0440": "p",
+            "\u0441": "c", "\u0443": "y", "\u0445": "x", "\u0456": "i",
+            "\u0458": "j", "\u04bb": "h", "\u04cf": "l", "\u0455": "s",
+            "\u0442": "t", "\u043d": "h", "\u043c": "m", "\u043a": "k",
+            "\u0432": "b", "\u0459": "j", "\u045a": "h",
+            # Cyrillic uppercase
+            "\u0410": "A", "\u0412": "B", "\u0415": "E", "\u041a": "K",
+            "\u041c": "M", "\u041d": "H", "\u041e": "O", "\u0420": "P",
+            "\u0421": "C", "\u0422": "T", "\u0425": "X", "\u0423": "Y",
+            "\u0417": "Z", "\u0406": "I", "\u0408": "J", "\u0405": "S",
+            "\u0404": "E",
+            # Greek lowercase
+            "\u03b1": "a", "\u03b5": "e", "\u03b7": "n", "\u03b9": "i",
+            "\u03ba": "k", "\u03bd": "v", "\u03bf": "o", "\u03c1": "p",
+            "\u03c4": "t", "\u03c5": "u", "\u03c7": "x", "\u03c9": "w",
+            "\u03b6": "z",
+            # Greek uppercase
+            "\u0391": "A", "\u0392": "B", "\u0395": "E", "\u0396": "Z",
+            "\u0397": "H", "\u0399": "I", "\u039a": "K", "\u039c": "M",
+            "\u039d": "N", "\u039f": "O", "\u03a1": "P", "\u03a4": "T",
+            "\u03a5": "Y", "\u03a7": "X",
+            # Armenian
+            "\u0570": "h", "\u0575": "n", "\u0578": "o", "\u057b": "j",
+            "\u0581": "g", "\u0585": "o",
+            # Cherokee
+            "\u13a0": "D", "\u13a2": "R", "\u13a9": "A", "\u13ab": "E",
+            "\u13ac": "S", "\u13b3": "W", "\u13b7": "M", "\u13bb": "H",
+            "\u13c0": "G", "\u13c3": "Z", "\u13de": "L", "\u13df": "C",
+            "\u13e6": "P", "\u13a1": "O", "\u13d4": "T",
+            # Fullwidth Latin lowercase
+            "\uff41": "a", "\uff42": "b", "\uff43": "c", "\uff44": "d",
+            "\uff45": "e", "\uff46": "f", "\uff47": "g", "\uff48": "h",
+            "\uff49": "i", "\uff4a": "j", "\uff4b": "k", "\uff4c": "l",
+            "\uff4d": "m", "\uff4e": "n", "\uff4f": "o", "\uff50": "p",
+            "\uff51": "q", "\uff52": "r", "\uff53": "s", "\uff54": "t",
+            "\uff55": "u", "\uff56": "v", "\uff57": "w", "\uff58": "x",
+            "\uff59": "y", "\uff5a": "z",
+            # Fullwidth Latin uppercase
+            "\uff21": "A", "\uff22": "B", "\uff23": "C", "\uff24": "D",
+            "\uff25": "E", "\uff26": "F", "\uff27": "G", "\uff28": "H",
+            "\uff29": "I", "\uff2a": "J", "\uff2b": "K", "\uff2c": "L",
+            "\uff2d": "M", "\uff2e": "N", "\uff2f": "O", "\uff30": "P",
+            "\uff31": "Q", "\uff32": "R", "\uff33": "S", "\uff34": "T",
+            "\uff35": "U", "\uff36": "V", "\uff37": "W", "\uff38": "X",
+            "\uff39": "Y", "\uff3a": "Z",
+            # Fullwidth digits
+            "\uff10": "0", "\uff11": "1", "\uff12": "2", "\uff13": "3",
+            "\uff14": "4", "\uff15": "5", "\uff16": "6", "\uff17": "7",
+            "\uff18": "8", "\uff19": "9",
+            # Latin Extended / IPA confusables
+            "\u0131": "i", "\u0251": "a", "\u0252": "a", "\u0259": "e",
+            "\u0263": "y", "\u0265": "h", "\u026a": "i", "\u026f": "m",
+            "\u0271": "m", "\u0272": "n", "\u0273": "n", "\u0274": "N",
+            "\u0275": "o", "\u0280": "R", "\u028b": "v", "\u028c": "v",
+            "\u028f": "Y", "\u0290": "z", "\u0291": "z", "\u0299": "B",
+            "\u029c": "H", "\u029f": "L",
+            # Mathematical bold (common subset)
+            "\U0001d400": "A", "\U0001d401": "B", "\U0001d402": "C",
+            "\U0001d403": "D", "\U0001d404": "E",
+            "\U0001d41a": "a", "\U0001d41b": "b", "\U0001d41c": "c",
+            "\U0001d41d": "d", "\U0001d41e": "e",
+            # Symbol confusables
+            "\u01c3": "!", "\u2024": ".", "\u2039": "<", "\u203a": ">",
         }
         found = []
         for char in text:

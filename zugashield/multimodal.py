@@ -89,6 +89,31 @@ class MultimodalScanner:
         self._stats["checks"] += 1
         threats: List[ThreatDetection] = []
 
+        # Degradation mode (Fix #8): handle missing Pillow
+        degradation = getattr(self._config, "multimodal_degradation_mode", "warn")
+        if image_path and not _HAS_PILLOW:
+            if degradation == "block":
+                return ShieldDecision(
+                    verdict=ShieldVerdict.CHALLENGE,
+                    threats_detected=[
+                        ThreatDetection(
+                            category=ThreatCategory.INDIRECT_INJECTION,
+                            level=ThreatLevel.MEDIUM,
+                            verdict=ShieldVerdict.CHALLENGE,
+                            description="Image scanning unavailable (Pillow not installed) — degradation_mode=block",
+                            evidence="pip install zugashield[image]",
+                            layer=self.LAYER_NAME,
+                            confidence=0.5,
+                            suggested_action="Install Pillow for image scanning",
+                            signature_id="MM-DEGRADE",
+                        )
+                    ],
+                    layer=self.LAYER_NAME,
+                    elapsed_ms=(time.perf_counter() - start) * 1000,
+                )
+            elif degradation == "warn":
+                logger.warning("[Multimodal] Pillow not installed, skipping image file scan")
+
         # Check EXIF / metadata
         if image_path and _HAS_PILLOW:
             meta_threats = self._check_image_metadata(image_path)

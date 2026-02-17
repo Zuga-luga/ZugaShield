@@ -218,12 +218,49 @@ All settings via environment variables — no config files needed:
 
 ```bash
 pip install zugashield[fastapi]     # Dashboard + API endpoints
-pip install zugashield[multimodal]  # Image scanning (Pillow)
-pip install zugashield[llm-judge]   # LLM deep analysis (Anthropic)
+pip install zugashield[image]       # Image scanning (Pillow)
+pip install zugashield[anthropic]   # LLM deep analysis (Anthropic)
 pip install zugashield[mcp]         # MCP server
+pip install zugashield[homoglyphs]  # Extended unicode confusable detection
 pip install zugashield[all]         # Everything above
 pip install zugashield[dev]         # Development (pytest, ruff)
 ```
+
+## Comparison with Other Tools
+
+How does ZugaShield compare to other open-source AI security projects?
+
+| Capability | ZugaShield | NeMo Guardrails | LlamaFirewall | LLM Guard | Guardrails AI | Vigil |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| Prompt injection detection | 150+ sigs | Colang rules | PromptGuard 2 | DeBERTa model | Validators | Yara + embeddings |
+| Tool call validation (SSRF, cmd injection) | Layer 3 | - | - | - | - | - |
+| Memory poisoning defense | Layer 4 | - | - | - | - | - |
+| RAG document pre-scan | Layer 4 | - | - | - | - | - |
+| Secret / PII leakage (DLP) | 70+ patterns | - | - | Presidio | Regex validators | - |
+| Canary token traps | Built-in | - | - | - | - | - |
+| DNS exfiltration detection | Built-in | - | - | - | - | - |
+| Behavioral anomaly / session tracking | Layer 6 | - | - | - | - | - |
+| Crypto wallet attack defense | Layer 7 | - | - | - | - | - |
+| MCP tool definition scanning | Built-in | - | - | - | - | - |
+| Chain-of-thought auditing | Optional | - | - | - | - | - |
+| LLM-generated code scanning | Optional | - | - | - | - | - |
+| Multimodal (image) scanning | Optional | - | - | - | - | - |
+| Framework adapters | 6 frameworks | LangChain | - | LangChain | LangChain | - |
+| Zero dependencies | Yes | No (17+) | No (PyTorch) | No (torch) | No | No |
+| Avg latency (fast path) | < 15ms | 100-500ms | 50-200ms | 50-300ms | 20-100ms | 10-50ms |
+| Verdicts | 5-level | allow/block | allow/block | allow/block | pass/fail | allow/block |
+| Human-in-the-loop | Built-in | - | - | - | - | - |
+| Fail-closed mode | Built-in | - | - | - | - | - |
+
+**Key differentiators**: ZugaShield is the only tool that combines prompt injection defense with memory poisoning detection, financial transaction security, MCP protocol auditing, behavioral anomaly correlation, and chain-of-thought auditing — all with zero required dependencies and sub-15ms latency.
+
+**NeMo Guardrails** (NVIDIA, 12k+ stars) excels at conversation flow control via its Colang DSL but requires significant infrastructure and doesn't cover tool-level or memory-level attacks.
+
+**LlamaFirewall** (Meta, 2k+ stars) uses PromptGuard 2 (a fine-tuned DeBERTa model) for high-accuracy injection detection but requires PyTorch and GPU for best performance.
+
+**LLM Guard** (ProtectAI, 4k+ stars) offers strong ML-based detection via DeBERTa/Presidio but needs torch and transformer models installed.
+
+**Guardrails AI** (4k+ stars) focuses on output structure validation (JSON schemas, format constraints) rather than adversarial attack detection.
 
 ## Contributing
 

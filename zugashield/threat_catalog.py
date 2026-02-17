@@ -107,13 +107,18 @@ class ThreatCatalog:
 
     Loads signatures from JSON files, compiles them, and provides
     fast pattern matching against input text.
+
+    When ``verify_integrity=True`` and an ``integrity.json`` file exists
+    in the signatures directory, SHA-256 hashes of each signature file
+    are verified on load. Tampered files raise ``SecurityError``.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, verify_integrity: bool = True) -> None:
         self._signatures: Dict[ThreatCategory, List[ThreatSignature]] = {cat: [] for cat in ThreatCategory}
         self._version: str = "0.0.0"
         self._last_updated: Optional[datetime] = None
         self._total_signatures: int = 0
+        self._verify_integrity = verify_integrity
         self._load_default_signatures()
 
     def _load_default_signatures(self) -> None:
@@ -121,6 +126,43 @@ class ThreatCatalog:
         sig_dir = Path(__file__).parent / "signatures"
         if sig_dir.exists():
             self.load_signatures_dir(str(sig_dir))
+
+    def _verify_signature_integrity(self, dir_path: Path) -> None:
+        """
+        Verify SHA-256 integrity of signature files (Fix #12).
+
+        If ``integrity.json`` exists, verify each signature file's hash.
+        If ``integrity.json`` is absent (dev mode), skip verification.
+        Raises ``SecurityError`` on hash mismatch.
+        """
+        import hashlib
+
+        integrity_file = dir_path / "integrity.json"
+        if not integrity_file.exists():
+            logger.debug("[ThreatCatalog] No integrity.json found, skipping verification (dev mode)")
+            return
+
+        try:
+            with open(integrity_file, "r", encoding="utf-8") as f:
+                expected_hashes = json.load(f)
+        except Exception as e:
+            raise SecurityError(f"Failed to read integrity.json: {e}") from e
+
+        for filename, expected_hash in expected_hashes.items():
+            filepath = dir_path / filename
+            if not filepath.exists():
+                raise SecurityError(f"Signature file missing: {filename}")
+
+            with open(filepath, "rb") as f:
+                actual_hash = hashlib.sha256(f.read()).hexdigest()
+
+            if actual_hash != expected_hash:
+                raise SecurityError(
+                    f"Signature file tampered: {filename} "
+                    f"(expected {expected_hash[:16]}..., got {actual_hash[:16]}...)"
+                )
+
+        logger.debug("[ThreatCatalog] Integrity verified for %d signature files", len(expected_hashes))
 
     def load_signatures_dir(self, dir_path: str) -> int:
         """
@@ -136,6 +178,10 @@ class ThreatCatalog:
             logger.warning("[ThreatCatalog] Signatures dir not found: %s", dir_path)
             return 0
 
+        # Verify integrity before loading (Fix #12)
+        if self._verify_integrity:
+            self._verify_signature_integrity(dir_path)
+
         # Load version info if present
         version_file = dir_path / "catalog_version.json"
         if version_file.exists():
@@ -149,7 +195,7 @@ class ThreatCatalog:
 
         # Load each category file
         for json_file in sorted(dir_path.glob("*.json")):
-            if json_file.name == "catalog_version.json":
+            if json_file.name in ("catalog_version.json", "integrity.json"):
                 continue
             try:
                 count = self._load_signature_file(json_file)

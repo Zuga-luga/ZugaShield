@@ -1,0 +1,92 @@
+name: Security Scan
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly on Monday at 6am UTC
+  push:
+    branches: [main]
+    paths:
+      - 'zugashield/**'
+      - 'pyproject.toml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          queries: security-extended
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"
+
+  pip-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Install package with all extras
+        run: pip install -e ".[all,dev]"
+
+      - name: Run pip-audit
+        run: pip-audit --strict --desc
+
+  bandit:
+    name: Bandit Security Linter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install bandit
+        run: pip install bandit[toml]
+
+      - name: Run bandit
+        run: bandit -r zugashield/ -c pyproject.toml || bandit -r zugashield/ -ll
+
+  signature-integrity:
+    name: Verify Signature Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Verify signature integrity
+        run: |
+          python -c "
+          from zugashield.threat_catalog import ThreatCatalog
+          catalog = ThreatCatalog(verify_integrity=True)
+          stats = catalog.get_stats()
+          print(f'Catalog v{stats[\"version\"]}: {stats[\"total_signatures\"]} signatures verified')
+          assert stats['total_signatures'] > 100, f'Expected 100+ signatures, got {stats[\"total_signatures\"]}'
+          print('Signature integrity check PASSED')
+          "

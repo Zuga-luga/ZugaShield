@@ -14,6 +14,7 @@ Integration point: middleware in setup_all_middleware()
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
 from collections import defaultdict, deque
@@ -34,14 +35,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Sensitive endpoints with stricter rate limits
-_SENSITIVE_ENDPOINTS = {
-    "/api/chat/message": 20,  # messages per minute
-    "/api/brain/actions": 10,
-    "/api/brain/start": 5,
-    "/api/admin/": 10,
-    "/api/wallet/": 5,
-}
+# Global rate tracker keyed by hash of (client_ip + user_agent): {endpoint: deque of timestamps}
+_global_rate_tracker: Dict[str, Dict[str, deque]] = defaultdict(lambda: defaultdict(lambda: deque(maxlen=200)))
 
 
 class PerimeterLayer:
@@ -59,7 +54,7 @@ class PerimeterLayer:
         self._catalog = catalog
         # Rate tracking: {client_id: {endpoint: deque of timestamps}}
         self._rate_tracker: Dict[str, Dict[str, deque]] = defaultdict(lambda: defaultdict(lambda: deque(maxlen=200)))
-        self._stats = {"checks": 0, "blocked": 0, "rate_limits": 0, "oversized": 0}
+        self._stats = {"checks": 0, "blocked": 0, "rate_limits": 0, "oversized": 0, "global_rate_limits": 0}
 
     async def check(
         self,
@@ -69,6 +64,7 @@ class PerimeterLayer:
         body: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
         client_ip: str = "unknown",
+        user_agent: str = "",
     ) -> ShieldDecision:
         """
         Check an incoming HTTP request.
@@ -106,7 +102,7 @@ class PerimeterLayer:
             )
 
         # === Check 2: Endpoint rate limiting ===
-        rate_threat = self._check_endpoint_rate(path, client_ip)
+        rate_threat = self._check_endpoint_rate(path, client_ip, user_agent)
         if rate_threat:
             threats.append(rate_threat)
 
@@ -156,13 +152,13 @@ class PerimeterLayer:
             elapsed_ms=elapsed,
         )
 
-    def _check_endpoint_rate(self, path: str, client_ip: str) -> Optional[ThreatDetection]:
-        """Check endpoint-specific rate limits."""
+    def _check_endpoint_rate(self, path: str, client_ip: str, user_agent: str = "") -> Optional[ThreatDetection]:
+        """Check endpoint-specific rate limits (per-session and global by IP+UA hash)."""
         now = time.time()
 
-        # Find matching endpoint
+        # Find matching endpoint from config
         limit = None
-        for endpoint, rate in _SENSITIVE_ENDPOINTS.items():
+        for endpoint, rate in self._config.sensitive_endpoints:
             if path.startswith(endpoint):
                 limit = rate
                 break
@@ -170,10 +166,11 @@ class PerimeterLayer:
         if limit is None:
             return None
 
+        # Per-session (per-IP) rate check
         tracker = self._rate_tracker[client_ip][path]
         tracker.append(now)
-
         recent = sum(1 for t in tracker if t > now - 60)
+
         if recent > limit:
             self._stats["rate_limits"] += 1
             return ThreatDetection(
@@ -187,6 +184,29 @@ class PerimeterLayer:
                 suggested_action="Throttle requests",
                 signature_id="PM-RATE",
             )
+
+        # Global rate check by IP+UA hash (Fix #5: catch multi-session coordination)
+        ua_hash = hashlib.sha256((client_ip + user_agent).encode()).hexdigest()[:16]
+        global_tracker = _global_rate_tracker[ua_hash][path]
+        global_tracker.append(now)
+        global_recent = sum(1 for t in global_tracker if t > now - 60)
+
+        # Global limit is 2x the per-session limit to account for legitimate multi-tab usage
+        global_limit = limit * 2
+        if global_recent > global_limit:
+            self._stats["global_rate_limits"] += 1
+            return ThreatDetection(
+                category=ThreatCategory.BEHAVIORAL_ANOMALY,
+                level=ThreatLevel.MEDIUM,
+                verdict=ShieldVerdict.CHALLENGE,
+                description=f"Global rate limit: {path} at {global_recent}/{global_limit} per minute (IP+UA)",
+                evidence=f"{global_recent} requests in 60s from IP+UA hash {ua_hash}",
+                layer=self.LAYER_NAME,
+                confidence=0.85,
+                suggested_action="Throttle requests globally",
+                signature_id="PM-RATE-GLOBAL",
+            )
+
         return None
 
     def _check_headers(self, headers: Dict[str, str]) -> List[ThreatDetection]:

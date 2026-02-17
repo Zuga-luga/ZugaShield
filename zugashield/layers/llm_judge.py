@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Dict, TYPE_CHECKING
+from typing import Dict, Optional, Tuple, TYPE_CHECKING
 
 from zugashield.types import (
     ThreatCategory,
@@ -30,15 +30,6 @@ from zugashield.types import (
 
 if TYPE_CHECKING:
     from zugashield.config import ShieldConfig
-
-# Optional anthropic import
-try:
-    import anthropic
-
-    _HAS_ANTHROPIC = True
-except ImportError:
-    anthropic = None
-    _HAS_ANTHROPIC = False
 
 logger = logging.getLogger(__name__)
 
@@ -73,20 +64,61 @@ class LLMJudgeLayer:
     def __init__(self, config: ShieldConfig) -> None:
         self._config = config
         self._enabled = getattr(config, "llm_judge_enabled", False)
-        self._client = None
+        self._provider: Optional[Tuple] = None
+        self._provider_name = "none"
         self._stats = {"checks": 0, "escalations": 0, "blocks": 0, "errors": 0}
 
-        if self._enabled and _HAS_ANTHROPIC:
+        if not self._enabled:
+            return
+
+        preferred = getattr(config, "llm_provider", None)
+        model_override = getattr(config, "llm_model", None)
+
+        # Try providers in priority order
+        if preferred == "anthropic" or (preferred is None):
             try:
-                self._client = anthropic.Anthropic()
+                import anthropic
+                self._provider = ("anthropic", anthropic.Anthropic(), model_override or "claude-haiku-4-5-20251001")
+                self._provider_name = "anthropic"
                 logger.info("[LLMJudge] Initialized with Anthropic API")
-            except Exception as e:
-                logger.warning("[LLMJudge] Failed to init Anthropic client: %s", e)
-                self._enabled = False
+                return
+            except (ImportError, Exception) as e:
+                if preferred == "anthropic":
+                    logger.warning("[LLMJudge] Anthropic requested but failed: %s", e)
+                    self._enabled = False
+                    return
+
+        if preferred == "openai" or (preferred is None and self._provider is None):
+            try:
+                import openai
+                self._provider = ("openai", openai.OpenAI(), model_override or "gpt-4o-mini")
+                self._provider_name = "openai"
+                logger.info("[LLMJudge] Initialized with OpenAI API")
+                return
+            except (ImportError, Exception) as e:
+                if preferred == "openai":
+                    logger.warning("[LLMJudge] OpenAI requested but failed: %s", e)
+                    self._enabled = False
+                    return
+
+        if preferred == "litellm" or (preferred is None and self._provider is None):
+            try:
+                import litellm
+                self._provider = ("litellm", litellm, model_override or "gpt-4o-mini")
+                self._provider_name = "litellm"
+                logger.info("[LLMJudge] Initialized with LiteLLM")
+                return
+            except (ImportError, Exception) as e:
+                if preferred == "litellm":
+                    logger.warning("[LLMJudge] LiteLLM requested but failed: %s", e)
+
+        if self._provider is None:
+            logger.info("[LLMJudge] No LLM provider available, judge disabled")
+            self._enabled = False
 
     @property
     def is_available(self) -> bool:
-        return self._enabled and self._client is not None
+        return self._enabled and self._provider is not None
 
     def should_escalate(self, decision: ShieldDecision) -> bool:
         """Determine if a decision should be escalated to the LLM judge."""
@@ -128,14 +160,39 @@ class LLMJudgeLayer:
             # Truncate very long inputs
             truncated = text[:2000] if len(text) > 2000 else text
 
-            message = self._client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=10,
-                system=_JUDGE_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": truncated}],
-            )
+            provider_type, client, model = self._provider
 
-            response_text = message.content[0].text.strip().upper()
+            if provider_type == "anthropic":
+                message = client.messages.create(
+                    model=model, max_tokens=10,
+                    system=_JUDGE_SYSTEM_PROMPT,
+                    messages=[{"role": "user", "content": truncated}],
+                )
+                response_text = message.content[0].text.strip().upper()
+
+            elif provider_type == "openai":
+                response = client.chat.completions.create(
+                    model=model, max_tokens=10,
+                    messages=[
+                        {"role": "system", "content": _JUDGE_SYSTEM_PROMPT},
+                        {"role": "user", "content": truncated},
+                    ],
+                )
+                response_text = response.choices[0].message.content.strip().upper()
+
+            elif provider_type == "litellm":
+                response = client.completion(
+                    model=model, max_tokens=10,
+                    messages=[
+                        {"role": "system", "content": _JUDGE_SYSTEM_PROMPT},
+                        {"role": "user", "content": truncated},
+                    ],
+                )
+                response_text = response.choices[0].message.content.strip().upper()
+
+            else:
+                return fast_decision
+
             elapsed = (time.perf_counter() - start) * 1000
 
             if response_text == "BLOCK":
@@ -176,4 +233,4 @@ class LLMJudgeLayer:
             return fast_decision
 
     def get_stats(self) -> Dict:
-        return {"layer": self.LAYER_NAME, "available": self.is_available, **self._stats}
+        return {"layer": self.LAYER_NAME, "available": self.is_available, "provider": self._provider_name, **self._stats}

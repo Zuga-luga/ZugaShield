@@ -1,0 +1,10 @@
+{
+  "ascii_art.json": "e2e2154ea487e4f403f1869f53d875b7795620142501908e78820a274795d630",
+  "catalog_version.json": "1420f74944548ff4fb388b0b6e7838e7cd0fb9028a9664db2b3b524b5a0c42f6",
+  "exfiltration.json": "fb65fb2c52fd106e24e87b46fa7479c0488738b50d8f2c23a87a119c66f0fff4",
+  "memory_poisoning.json": "2cea4b6a2f75c7ccf7587ca3999272563ad3457b191fe72609e29a16146eca46",
+  "prompt_injection.json": "80fec98fdbf4afc5b037bb22b6c926175ed9678dbc3be8a55bb3b916a5955756",
+  "tool_exploitation.json": "a309fe8bc158020790168658b89a3cefe84b2e63cdead26b38b52bb84033946f",
+  "unicode_smuggling.json": "c633ee4dd07f8dfcdd36c097ec574ea2052b1dcf1532d8f875f1cc6eb0cf24b3",
+  "wallet_attacks.json": "18aaac9ef74a1e996c041d56f656856138a8d521e97095772a989a547b2d6c52"
+}

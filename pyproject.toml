@@ -4,54 +4,79 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zugashield"
-version = "1.0.2"
-description = "AI Agent Security System - 7-layer defense against prompt injection, data exfiltration, and AI-specific attacks"
+dynamic = ["version"]
+description = "Comprehensive 7-layer security system for AI agents — prompt injection, tool exploitation, memory poisoning, data exfiltration, and more."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
-    {name = "Antonio Zuga", email = "antonio@zuga.dev"},
+    {name = "Antonio Zugaldia", email = "antonio@zugaldia.com"},
 ]
 keywords = [
-    "ai-security", "prompt-injection", "llm-security", "mcp",
-    "data-loss-prevention", "ai-agent", "red-team", "defense",
+    "ai-safety", "llm-security", "prompt-injection", "guardrails",
+    "ai-agent", "security", "mcp", "data-loss-prevention", "red-team",
 ]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
     "Topic :: Security",
     "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
 ]
+
+# Zero required dependencies — runs with stdlib only
 dependencies = []
 
 [project.optional-dependencies]
-fastapi = ["fastapi>=0.100.0", "uvicorn>=0.20.0"]
-multimodal = ["Pillow>=9.0.0"]
-llm-judge = ["anthropic>=0.30.0"]
-mcp = ["mcp>=1.0.0; python_version>='3.10'"]
-all = [
-    "fastapi>=0.100.0",
-    "uvicorn>=0.20.0",
-    "Pillow>=9.0.0",
-    "anthropic>=0.30.0",
-    "mcp>=1.0.0; python_version>='3.10'",
-]
+# LLM judge layer providers
+anthropic = ["anthropic>=0.30.0"]
+openai = ["openai>=1.0.0"]
+litellm = ["litellm>=1.0.0"]
+
+# Enhanced detection
+homoglyphs = ["confusable-homoglyphs>=3.0.0"]
+ml = ["onnxruntime>=1.16.0"]
+
+# Multimodal scanning
+image = ["Pillow>=10.0.0"]
+
+# Framework integrations
+fastapi = ["fastapi>=0.100.0"]
+flask = ["flask>=2.0.0"]
+starlette = ["starlette>=0.27.0"]
+langchain = ["langchain-core>=0.1.0"]
+llamaindex = ["llama-index-core>=0.10.0"]
+crewai = ["crewai>=0.1.0"]
+
+# MCP
+mcp = ["mcp>=1.0.0"]
+
+# Code scanning
+semgrep = ["semgrep>=1.0.0"]
+
+# Development
 dev = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-benchmark>=4.0",
+    "pytest-cov>=4.0",
+    "mypy>=1.5",
     "ruff>=0.1.0",
+]
+
+# All optional features
+all = [
+    "zugashield[anthropic,openai,homoglyphs,image,fastapi,mcp]",
 ]
 
 [project.urls]
 Homepage = "https://github.com/Zuga-luga/ZugaShield"
-Documentation = "https://github.com/Zuga-luga/ZugaShield#readme"
+Documentation = "https://zugashield.dev"
 Repository = "https://github.com/Zuga-luga/ZugaShield"
 Issues = "https://github.com/Zuga-luga/ZugaShield/issues"
 Changelog = "https://github.com/Zuga-luga/ZugaShield/blob/main/CHANGELOG.md"
@@ -59,14 +84,29 @@ Changelog = "https://github.com/Zuga-luga/ZugaShield/blob/main/CHANGELOG.md"
 [project.scripts]
 zugashield-mcp = "zugashield_mcp.server:main"
 
+[tool.hatch.version]
+path = "zugashield/_version.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["zugashield", "zugashield_mcp"]
 
-[tool.hatch.build.targets.wheel.shared-data]
-
 [tool.pytest.ini_options]
+testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "slow: marks tests as slow",
+    "benchmark: performance benchmark tests",
+]
+
+[tool.mypy]
+strict = true
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
 
 [tool.ruff]
-line-length = 120
-target-version = "py39"
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "TCH"]
