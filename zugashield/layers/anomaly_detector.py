@@ -18,8 +18,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import Counter, defaultdict, deque
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Dict, List, TYPE_CHECKING
 
 from zugashield.types import (
     AnomalyScore,
@@ -228,7 +227,7 @@ class AnomalyDetectorLayer:
                 level=ThreatLevel.HIGH,
                 verdict=ShieldVerdict.QUARANTINE,
                 description=f"Alternating benign/malicious pattern: {alternations} alternations in {len(recent)} events",
-                evidence=f"Levels: {[l.value for l in levels]}",
+                evidence=f"Levels: {[lv.value for lv in levels]}",
                 layer=self.LAYER_NAME,
                 confidence=0.70,
                 suggested_action="Increase scrutiny on all requests",

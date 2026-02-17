@@ -18,8 +18,8 @@ from __future__ import annotations
 import logging
 import re
 import time
-from collections import defaultdict, deque
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from collections import deque
+from typing import Dict, List, Optional, Set, TYPE_CHECKING
 
 from zugashield.types import (
     ThreatCategory,
@@ -28,7 +28,6 @@ from zugashield.types import (
     ShieldDecision,
     ShieldVerdict,
     allow_decision,
-    block_decision,
 )
 
 if TYPE_CHECKING:

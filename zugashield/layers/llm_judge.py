@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Dict, TYPE_CHECKING
 
 from zugashield.types import (
     ThreatCategory,
@@ -26,7 +26,6 @@ from zugashield.types import (
     ThreatLevel,
     ShieldDecision,
     ShieldVerdict,
-    allow_decision,
 )
 
 if TYPE_CHECKING:

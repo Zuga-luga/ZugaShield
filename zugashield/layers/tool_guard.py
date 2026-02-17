@@ -20,7 +20,6 @@ import os
 import re
 import time
 from collections import defaultdict, deque
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from zugashield.types import (
@@ -31,7 +30,6 @@ from zugashield.types import (
     ShieldVerdict,
     ToolPolicy,
     allow_decision,
-    block_decision,
 )
 
 if TYPE_CHECKING:
@@ -414,7 +412,7 @@ class ToolGuardLayer:
                     level=ThreatLevel.MEDIUM,
                     verdict=ShieldVerdict.CHALLENGE,
                     description="Injection chain: web fetch → memory store",
-                    evidence=f"Fetched content then storing to memory",
+                    evidence="Fetched content then storing to memory",
                     layer=self.LAYER_NAME,
                     confidence=0.65,
                     suggested_action="Validate memory content from external source",

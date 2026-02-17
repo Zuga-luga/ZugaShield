@@ -1,7 +1,7 @@
 """ZugaShield test configuration."""
 
 import pytest
-from zugashield import get_zugashield, reset_zugashield
+from zugashield import reset_zugashield
 
 
 @pytest.fixture(autouse=True)

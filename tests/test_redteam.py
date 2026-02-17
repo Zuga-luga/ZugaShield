@@ -7,9 +7,8 @@ Adversarial tests for all 7 layers plus new gap detections.
 
 import asyncio
 import base64
-import pytest
 
-from zugashield import get_zugashield, reset_zugashield, ShieldVerdict
+from zugashield import get_zugashield, ShieldVerdict
 
 
 def shield():

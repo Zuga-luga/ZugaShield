@@ -20,7 +20,7 @@ import logging
 import math
 import re
 import time
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Dict, List, Optional, TYPE_CHECKING
 
 from zugashield.types import (
     ThreatCategory,
@@ -245,7 +245,7 @@ class ExfiltrationGuardLayer:
                 level=ThreatLevel.CRITICAL,
                 verdict=ShieldVerdict.BLOCK,
                 description=f"Canary token leaked in output (session={session_id})",
-                evidence=f"canary-*** detected in output",
+                evidence="canary-*** detected in output",
                 layer=self.LAYER_NAME,
                 confidence=0.99,
                 suggested_action="Block output — confirmed prompt injection exfiltration",
@@ -261,7 +261,7 @@ class ExfiltrationGuardLayer:
                     level=ThreatLevel.CRITICAL,
                     verdict=ShieldVerdict.BLOCK,
                     description=f"Cross-session canary token leaked (from session={sid})",
-                    evidence=f"canary-*** from another session detected",
+                    evidence="canary-*** from another session detected",
                     layer=self.LAYER_NAME,
                     confidence=0.99,
                     suggested_action="Block output — cross-session canary leak",
@@ -285,7 +285,6 @@ class ExfiltrationGuardLayer:
         - High-entropy subdomain labels (>4.0 bits/char on labels >15 chars)
         """
         from urllib.parse import urlparse
-        import math
 
         try:
             # Handle both full URLs and bare domains
@@ -411,7 +410,6 @@ class ExfiltrationGuardLayer:
         for threat in threats:
             if threat.evidence and threat.evidence != "***":
                 # Find and replace the original evidence in the output
-                original = threat.evidence.replace("...", "")
                 if "..." in threat.evidence:
                     prefix = threat.evidence.split("...")[0]
                     suffix = threat.evidence.split("...")[-1]

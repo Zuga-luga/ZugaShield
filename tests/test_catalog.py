@@ -1,7 +1,5 @@
 """Tests for threat catalog integrity."""
 
-import pytest
-from zugashield import get_zugashield
 from zugashield.threat_catalog import ThreatCatalog
 from zugashield.types import ThreatCategory
 

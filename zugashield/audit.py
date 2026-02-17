@@ -14,9 +14,7 @@ Uses in-memory ring buffer with optional database persistence.
 
 from __future__ import annotations
 
-import json
 import logging
-import time
 from collections import deque
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -25,8 +23,6 @@ from typing import Any, Dict, List, Optional
 from zugashield.types import (
     ShieldDecision,
     ShieldVerdict,
-    ThreatDetection,
-    ThreatLevel,
 )
 
 logger = logging.getLogger(__name__)

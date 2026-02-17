@@ -28,7 +28,7 @@ import asyncio
 import json
 import logging
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ try:
 except ImportError:
     _HAS_MCP = False
 
-from zugashield import ZugaShield, ShieldConfig
+from zugashield import ZugaShield  # noqa: E402
 
 
 def _decision_to_dict(decision) -> Dict[str, Any]:

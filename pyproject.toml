@@ -50,10 +50,11 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/zugadev/zugashield"
-Documentation = "https://github.com/zugadev/zugashield#readme"
-Repository = "https://github.com/zugadev/zugashield"
-Issues = "https://github.com/zugadev/zugashield/issues"
+Homepage = "https://github.com/Zuga-luga/ZugaShield"
+Documentation = "https://github.com/Zuga-luga/ZugaShield#readme"
+Repository = "https://github.com/Zuga-luga/ZugaShield"
+Issues = "https://github.com/Zuga-luga/ZugaShield/issues"
+Changelog = "https://github.com/Zuga-luga/ZugaShield/blob/main/CHANGELOG.md"
 
 [project.scripts]
 zugashield-mcp = "zugashield_mcp.server:main"

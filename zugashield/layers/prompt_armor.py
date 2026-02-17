@@ -26,7 +26,7 @@ import unicodedata
 import uuid
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Dict, List, Optional, TYPE_CHECKING
 
 from zugashield.types import (
     ThreatCategory,
@@ -35,7 +35,6 @@ from zugashield.types import (
     ShieldDecision,
     ShieldVerdict,
     allow_decision,
-    block_decision,
 )
 
 # TR39 confusable detection — falls back gracefully if not installed
@@ -372,7 +371,7 @@ class PromptArmorLayer:
                 level=ThreatLevel.HIGH,
                 verdict=ShieldVerdict.QUARANTINE,
                 description=f"RTL override characters detected ({len(rtl_matches)})",
-                evidence=f"Positions with RTL override",
+                evidence="Positions with RTL override",
                 layer=self.LAYER_NAME,
                 confidence=0.90,
                 suggested_action="Strip RTL overrides and re-check",
@@ -387,7 +386,7 @@ class PromptArmorLayer:
                 level=ThreatLevel.HIGH,
                 verdict=ShieldVerdict.QUARANTINE,
                 description=f"Unicode tag characters detected ({len(tag_matches)})",
-                evidence=f"Tag chars in U+E0000 range",
+                evidence="Tag chars in U+E0000 range",
                 layer=self.LAYER_NAME,
                 confidence=0.90,
                 suggested_action="Strip tag characters",
@@ -511,7 +510,7 @@ class PromptArmorLayer:
                 level=ThreatLevel.MEDIUM,
                 verdict=ShieldVerdict.CHALLENGE,
                 description=f"Braille characters detected ({braille_chars})",
-                evidence=f"Braille pattern chars in text",
+                evidence="Braille pattern chars in text",
                 layer=self.LAYER_NAME,
                 confidence=0.70,
                 suggested_action="Decode braille patterns and check for instructions",
