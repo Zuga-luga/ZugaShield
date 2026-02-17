@@ -55,6 +55,24 @@ async def main():
 asyncio.run(main())
 ```
 
+### Try It Yourself
+
+Run the built-in attack test suite to see ZugaShield in action:
+
+```bash
+pip install zugashield
+python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/Zuga-luga/ZugaShield/master/examples/test_it_yourself.py').read())"
+```
+
+Or clone and run locally:
+
+```bash
+git clone https://github.com/Zuga-luga/ZugaShield.git
+cd ZugaShield && pip install -e . && python examples/test_it_yourself.py
+```
+
+Expected output: 10/10 attacks blocked, 0 false positives, <1ms average scan time.
+
 ## Architecture
 
 ZugaShield uses layered defense — every input and output passes through multiple independent detection engines. If one layer misses an attack, the next one catches it.
