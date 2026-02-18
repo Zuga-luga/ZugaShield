@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -33,6 +34,11 @@ from zugashield.types import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class SecurityError(Exception):
+    """Raised when signature integrity verification fails."""
+
 
 # Map category names in JSON to ThreatCategory enum
 _CATEGORY_MAP: Dict[str, ThreatCategory] = {
@@ -119,6 +125,7 @@ class ThreatCatalog:
         self._last_updated: Optional[datetime] = None
         self._total_signatures: int = 0
         self._verify_integrity = verify_integrity
+        self._update_lock = threading.Lock()
         self._load_default_signatures()
 
     def _load_default_signatures(self) -> None:
@@ -149,6 +156,9 @@ class ThreatCatalog:
             raise SecurityError(f"Failed to read integrity.json: {e}") from e
 
         for filename, expected_hash in expected_hashes.items():
+            # Skip metadata sections (e.g. _models) — not signature files
+            if filename.startswith("_"):
+                continue
             filepath = dir_path / filename
             if not filepath.exists():
                 raise SecurityError(f"Signature file missing: {filename}")
@@ -245,6 +255,97 @@ class ThreatCatalog:
 
         return count
 
+    def hot_reload(self, new_signatures_dir: str) -> int:
+        """
+        Build new catalog from directory and swap atomically.
+
+        Uses copy-on-write: builds the full replacement dict outside
+        the lock, then swaps the reference in microseconds. Readers
+        that already grabbed ``self._signatures`` keep iterating the
+        old dict safely (Python refcounting keeps it alive).
+
+        Returns:
+            Number of signatures in the new catalog.
+        """
+        dir_path = Path(new_signatures_dir)
+        if not dir_path.exists():
+            logger.error("[ThreatCatalog] hot_reload dir not found: %s", dir_path)
+            return self._total_signatures
+
+        # Build replacement outside any lock
+        new_sigs: Dict[ThreatCategory, List[ThreatSignature]] = {cat: [] for cat in ThreatCategory}
+        new_version = self._version
+        new_last_updated: Optional[datetime] = None
+
+        # Verify integrity of new files
+        if self._verify_integrity:
+            self._verify_signature_integrity(dir_path)
+
+        # Load version info
+        version_file = dir_path / "catalog_version.json"
+        if version_file.exists():
+            try:
+                with open(version_file, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                new_version = meta.get("version", new_version)
+                new_last_updated = (
+                    datetime.fromisoformat(meta["last_updated"])
+                    if "last_updated" in meta
+                    else None
+                )
+            except Exception as e:
+                logger.warning("[ThreatCatalog] hot_reload version file error: %s", e)
+
+        # Load signatures into new dict
+        count = 0
+        for json_file in sorted(dir_path.glob("*.json")):
+            if json_file.name in ("catalog_version.json", "integrity.json"):
+                continue
+            try:
+                with open(json_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                for sig_data in data.get("signatures", []):
+                    category_str = sig_data.get("category", "")
+                    category = _CATEGORY_MAP.get(category_str)
+                    if category is None:
+                        continue
+                    severity = _LEVEL_MAP.get(
+                        sig_data.get("severity", "medium"), ThreatLevel.MEDIUM
+                    )
+                    sig = ThreatSignature(
+                        id=sig_data["id"],
+                        category=category,
+                        name=sig_data.get("name", sig_data["id"]),
+                        description=sig_data.get("description", ""),
+                        patterns=sig_data.get("patterns", []),
+                        severity=severity,
+                        confidence=sig_data.get("confidence", 0.8),
+                        false_positive_rate=sig_data.get("false_positive_rate", 0.01),
+                        references=sig_data.get("references", []),
+                        enabled=sig_data.get("enabled", True),
+                    )
+                    new_sigs[category].append(sig)
+                    count += 1
+            except Exception as e:
+                logger.error("[ThreatCatalog] hot_reload failed on %s: %s", json_file.name, e)
+
+        if count == 0:
+            logger.error("[ThreatCatalog] hot_reload produced 0 signatures, aborting swap")
+            return self._total_signatures
+
+        # Atomic swap (microseconds under lock)
+        with self._update_lock:
+            self._signatures = new_sigs
+            self._version = new_version
+            self._last_updated = new_last_updated
+            self._total_signatures = count
+
+        logger.info(
+            "[ThreatCatalog] hot_reload complete: v%s, %d signatures",
+            new_version, count,
+        )
+        return count
+
     def check(
         self,
         text: str,
@@ -263,12 +364,15 @@ class ThreatCatalog:
         if not text:
             return []
 
+        # Local reference for thread safety — if hot_reload() swaps
+        # self._signatures mid-iteration, we keep reading the old dict.
+        current = self._signatures
         cats = categories or list(ThreatCategory)
         detections: List[ThreatDetection] = []
         text_lower = text.lower()
 
         for cat in cats:
-            for sig in self._signatures.get(cat, []):
+            for sig in current.get(cat, []):
                 result = sig.check(text_lower)
                 if result:
                     pattern_str, matched_text = result

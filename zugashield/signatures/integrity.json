@@ -6,5 +6,8 @@
   "prompt_injection.json": "80fec98fdbf4afc5b037bb22b6c926175ed9678dbc3be8a55bb3b916a5955756",
   "tool_exploitation.json": "a309fe8bc158020790168658b89a3cefe84b2e63cdead26b38b52bb84033946f",
   "unicode_smuggling.json": "c633ee4dd07f8dfcdd36c097ec574ea2052b1dcf1532d8f875f1cc6eb0cf24b3",
-  "wallet_attacks.json": "18aaac9ef74a1e996c041d56f656856138a8d521e97095772a989a547b2d6c52"
+  "wallet_attacks.json": "18aaac9ef74a1e996c041d56f656856138a8d521e97095772a989a547b2d6c52",
+  "_models": {
+    "tfidf_injection.joblib": "8eb0af71f7a50e020b24d8a368de2cb6a5ceff44f89571810ab6801f7604d968"
+  }
 }

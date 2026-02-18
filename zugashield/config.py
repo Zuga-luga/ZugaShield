@@ -67,6 +67,13 @@ class ShieldConfig:
     cot_auditor_enabled: bool = True
     mcp_guard_enabled: bool = True
 
+    # ML-based prompt injection detection
+    ml_detector_enabled: bool = True          # Master toggle (degrades gracefully)
+    ml_model_dir: str = "~/.zugashield/models"  # ONNX model location
+    ml_confidence_threshold: float = 0.7      # Score above this = injection
+    ml_onnx_enabled: bool = True              # Enable ONNX tier (disable for TF-IDF only)
+    ml_model_version: str = ""                # Empty = accept any. "2.0.0" = require exact match
+
     # Perimeter thresholds
     max_message_size: int = 51200  # 50KB
     max_unicode_density: float = 0.3  # Flag if >30% non-ASCII
@@ -114,6 +121,16 @@ class ShieldConfig:
     # Signature integrity verification (Fix #12)
     verify_signatures: bool = True
 
+    # Threat Feed (auto-updating signatures)
+    feed_enabled: bool = False  # Opt-in (safe default)
+    feed_url: str = "https://github.com/Zuga-luga/ZugaShield/releases/latest/download"
+    feed_poll_interval: int = 3600  # 1 hour (minimum enforced: 900 = 15 min)
+    feed_startup_jitter: int = 300  # Random 0-300s delay on first check
+    feed_timeout: int = 30  # HTTP timeout seconds
+    feed_state_dir: str = "~/.zugashield"  # ETag cache + downloaded sigs
+    feed_verify_signatures: bool = True  # Require minisign verification
+    feed_fail_open: bool = True  # Continue on update failure
+
     # Config lock — prevents even builder from creating new configs at runtime
     _locked: bool = False
 
@@ -160,6 +177,11 @@ class ShieldConfig:
             code_scanner_enabled=_env_bool("ZUGASHIELD_CODE_SCANNER_ENABLED", True),
             cot_auditor_enabled=_env_bool("ZUGASHIELD_COT_AUDITOR_ENABLED", True),
             mcp_guard_enabled=_env_bool("ZUGASHIELD_MCP_GUARD_ENABLED", True),
+            ml_detector_enabled=_env_bool("ZUGASHIELD_ML_DETECTOR_ENABLED", True),
+            ml_model_dir=os.getenv("ZUGASHIELD_ML_MODEL_DIR", "~/.zugashield/models"),
+            ml_confidence_threshold=_env_float("ZUGASHIELD_ML_CONFIDENCE_THRESHOLD", 0.7),
+            ml_onnx_enabled=_env_bool("ZUGASHIELD_ML_ONNX_ENABLED", True),
+            ml_model_version=os.getenv("ZUGASHIELD_ML_MODEL_VERSION", ""),
             max_message_size=_env_int("ZUGASHIELD_MAX_MESSAGE_SIZE", 51200),
             max_unicode_density=_env_float("ZUGASHIELD_MAX_UNICODE_DENSITY", 0.3),
             tool_rate_limit=_env_int("ZUGASHIELD_TOOL_RATE_LIMIT", 30),
@@ -176,6 +198,17 @@ class ShieldConfig:
             llm_provider=os.getenv("ZUGASHIELD_LLM_PROVIDER"),
             llm_model=os.getenv("ZUGASHIELD_LLM_MODEL"),
             verify_signatures=_env_bool("ZUGASHIELD_VERIFY_SIGNATURES", True),
+            feed_enabled=_env_bool("ZUGASHIELD_FEED_ENABLED", False),
+            feed_url=os.getenv(
+                "ZUGASHIELD_FEED_URL",
+                "https://github.com/Zuga-luga/ZugaShield/releases/latest/download",
+            ),
+            feed_poll_interval=max(900, _env_int("ZUGASHIELD_FEED_POLL_INTERVAL", 3600)),
+            feed_startup_jitter=_env_int("ZUGASHIELD_FEED_STARTUP_JITTER", 300),
+            feed_timeout=_env_int("ZUGASHIELD_FEED_TIMEOUT", 30),
+            feed_state_dir=os.getenv("ZUGASHIELD_FEED_STATE_DIR", "~/.zugashield"),
+            feed_verify_signatures=_env_bool("ZUGASHIELD_FEED_VERIFY_SIGNATURES", True),
+            feed_fail_open=_env_bool("ZUGASHIELD_FEED_FAIL_OPEN", True),
             _locked=_env_bool("ZUGASHIELD_LOCK_CONFIG", False),
         )
 
@@ -213,7 +246,7 @@ class _ShieldConfigBuilder:
         all_layers = [
             "perimeter", "prompt_armor", "tool_guard", "memory_sentinel",
             "exfiltration_guard", "anomaly_detector", "wallet_fortress",
-            "llm_judge", "code_scanner", "cot_auditor", "mcp_guard",
+            "llm_judge", "code_scanner", "cot_auditor", "mcp_guard", "ml_detector",
         ]
         for layer in all_layers:
             key = f"{layer}_enabled"
@@ -268,6 +301,27 @@ class _ShieldConfigBuilder:
 
     def set_degradation_mode(self, mode: str) -> _ShieldConfigBuilder:
         self._kwargs["multimodal_degradation_mode"] = mode
+        return self
+
+    def enable_ml(
+        self,
+        model_dir: str = "~/.zugashield/models",
+        threshold: float = 0.7,
+    ) -> _ShieldConfigBuilder:
+        self._kwargs["ml_detector_enabled"] = True
+        self._kwargs["ml_model_dir"] = model_dir
+        self._kwargs["ml_confidence_threshold"] = threshold
+        return self
+
+    def enable_feed(
+        self,
+        url: Optional[str] = None,
+        interval: int = 3600,
+    ) -> _ShieldConfigBuilder:
+        self._kwargs["feed_enabled"] = True
+        if url:
+            self._kwargs["feed_url"] = url
+        self._kwargs["feed_poll_interval"] = max(900, interval)
         return self
 
     def build(self) -> ShieldConfig:
