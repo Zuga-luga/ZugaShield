@@ -181,14 +181,38 @@ export class ShieldClient {
 
   // ─── Connection Management ──────────────────────────────
 
+  /**
+   * Build a minimal environment for the child process.
+   * Only passes through variables needed for Python to run correctly.
+   * Prevents leaking host secrets (API keys, credentials) to the child.
+   */
+  private _buildChildEnv(): Record<string, string> {
+    const allowlist = [
+      // System essentials
+      "PATH", "SYSTEMROOT", "TEMP", "TMP", "HOME", "USERPROFILE",
+      "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA",
+      // Python runtime
+      "PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV", "CONDA_PREFIX",
+      // ZugaShield config (safe — these are non-secret settings)
+      "ZUGASHIELD_ENABLED", "ZUGASHIELD_STRICT_MODE", "ZUGASHIELD_FAIL_CLOSED",
+      "ZUGASHIELD_LOG_LEVEL", "ZUGASHIELD_VERIFY_SIGNATURES",
+      "ZUGASHIELD_FEED_ENABLED", "ZUGASHIELD_FEED_URL",
+      "ZUGASHIELD_FEED_POLL_INTERVAL", "ZUGASHIELD_FEED_STATE_DIR",
+    ];
+
+    const env: Record<string, string> = { PYTHONUNBUFFERED: "1" };
+    for (const key of allowlist) {
+      const val = process.env[key];
+      if (val !== undefined) env[key] = val;
+    }
+    return env;
+  }
+
   private async _connect(): Promise<void> {
     this.transport = new StdioClientTransport({
       command: this.config.mcp.python_executable,
       args: ["-m", "zugashield_mcp.server"],
-      env: {
-        ...(process.env as Record<string, string>),
-        PYTHONUNBUFFERED: "1",
-      },
+      env: this._buildChildEnv(),
       stderr: "pipe",
     });
 

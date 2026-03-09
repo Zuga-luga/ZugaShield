@@ -1,7 +1,7 @@
 {
   "name": "zugashield-openclaw-plugin",
-  "version": "0.1.0",
-  "description": "ZugaShield security scanning plugin for OpenClaw — protects all channels against prompt injection, SSRF, data leakage, and memory poisoning",
+  "version": "1.1.0",
+  "description": "ZugaShield security scanning plugin for OpenClaw — 7-layer defense + ML detection against prompt injection, SSRF, data leakage, memory poisoning, and all 10 OWASP Agentic AI risks",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -45,7 +45,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/AntonioCiolworking/zugashield"
+    "url": "https://github.com/Zuga-luga/ZugaShield"
   },
   "keywords": [
     "openclaw",
@@ -53,6 +53,10 @@
     "security",
     "prompt-injection",
     "zugashield",
-    "mcp"
+    "mcp",
+    "owasp",
+    "ai-safety",
+    "guardrails",
+    "llm-security"
   ]
 }

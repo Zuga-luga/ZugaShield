@@ -1,270 +1,204 @@
 """
-ZugaShield - AI Agent Security System
-=======================================
+ZugaShield — AI Agent Security System
+======================================
 
-7-layer defense system for AI agent threats:
+Public API facade that orchestrates all security layers.
 
-    Layer 1: Perimeter ─── HTTP middleware, request validation
-    Layer 2: Prompt Armor ── Injection detection, input sanitization
-    Layer 3: Tool Guard ──── Tool execution gating, parameter validation
-    Layer 4: Memory Sentinel ── Memory content validation, poison detection
-    Layer 5: Exfiltration Guard ── Output DLP, secret detection
-    Layer 6: Anomaly Detector ── Behavioral baselines, chain attack detection
-    Layer 7: Wallet Fortress ── Transaction approval, address validation
+Usage::
 
-Optional layers:
-    LLM Judge ──── Provider-agnostic deep analysis for ambiguous cases
-    Code Scanner ── LLM-generated code safety validation
-    CoT Auditor ─── Chain-of-thought trace deception detection
-    MCP Guard ──── MCP protocol security (tool definition integrity)
+    from zugashield import ZugaShield, get_zugashield
 
-Usage:
-    # Zero-config (2 lines)
-    from zugashield import ZugaShield
-    decision = await ZugaShield().check_prompt("user input")
+    # Zero-config
+    shield = ZugaShield()
+    decision = await shield.check_prompt("user input here")
+
+    if decision.is_blocked:
+        print(f"Blocked: {decision.threats_detected[0].description}")
 
     # Builder pattern
     shield = (ZugaShield.builder()
-        .fail_closed()
-        .enable_layers("prompt_armor", "tool_guard")
+        .fail_closed(True)
+        .strict_mode(True)
+        .set_tool_policy("web_search", rate=10)
         .build())
 
-    # Sync wrapper
+    # Singleton
+    shield = get_zugashield()
+
+    # Sync (Flask, Django, scripts)
     decision = shield.check_prompt_sync("user input")
 """
 
 from __future__ import annotations
 
 import asyncio
-import functools
 import logging
-import re
 import time
-from typing import Any, Callable, Coroutine, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from zugashield._version import __version__
+from zugashield.audit import ShieldAuditLogger
+from zugashield.config import ShieldConfig
+from zugashield.threat_catalog import ThreatCatalog
 from zugashield.types import (
     AnomalyScore,
-    MemoryTrust,
     ShieldDecision,
     ShieldVerdict,
     ThreatCategory,
     ThreatDetection,
     ThreatLevel,
-    ToolPolicy,
     allow_decision,
     block_decision,
 )
-from zugashield.config import ShieldConfig
-from zugashield.threat_catalog import ThreatCatalog
-from zugashield.audit import ShieldAuditLogger
 
-from zugashield.layers.perimeter import PerimeterLayer
-from zugashield.layers.prompt_armor import PromptArmorLayer
-from zugashield.layers.tool_guard import ToolGuardLayer
-from zugashield.layers.memory_sentinel import MemorySentinelLayer
-from zugashield.layers.exfiltration_guard import ExfiltrationGuardLayer
-from zugashield.layers.anomaly_detector import AnomalyDetectorLayer
-from zugashield.layers.wallet_fortress import WalletFortressLayer
-from zugashield.layers.llm_judge import LLMJudgeLayer
-from zugashield.multimodal import MultimodalScanner
+# Core layers (always importable)
+from zugashield.layers import (
+    BaseLayer,
+    PerimeterLayer,
+    PromptArmorLayer,
+    ToolGuardLayer,
+    MemorySentinelLayer,
+    ExfiltrationGuardLayer,
+    AnomalyDetectorLayer,
+    WalletFortressLayer,
+    LLMJudgeLayer,
+)
+
+# Optional layers — degrade gracefully if dependencies are missing
+try:
+    from zugashield.layers import CodeScannerLayer
+
+    _HAS_CODE_SCANNER = True
+except ImportError:
+    _HAS_CODE_SCANNER = False
+
+try:
+    from zugashield.layers import CoTAuditorLayer
+
+    _HAS_COT_AUDITOR = True
+except ImportError:
+    _HAS_COT_AUDITOR = False
+
+try:
+    from zugashield.layers import MCPGuardLayer
+
+    _HAS_MCP_GUARD = True
+except ImportError:
+    _HAS_MCP_GUARD = False
+
+try:
+    from zugashield.layers import MLDetectorLayer
+
+    _HAS_ML_DETECTOR = True
+except ImportError:
+    _HAS_ML_DETECTOR = False
 
 logger = logging.getLogger(__name__)
 
-# Approval provider interface for Human-in-the-Loop integration
-_approval_provider = None
 
-
-def set_approval_provider(provider: Any) -> None:
-    """Set an external approval provider for HIL integration."""
-    global _approval_provider
-    _approval_provider = provider
-
-
-def get_approval_provider() -> Any:
-    """Get the current approval provider (or None)."""
-    return _approval_provider
-
-
-# =============================================================================
-# Event hooks
-# =============================================================================
-
-ThreatHandler = Callable[[ShieldDecision], Coroutine[Any, Any, None]]
-
-
-class _EventHooks:
-    """Registry for event hooks."""
-
-    def __init__(self) -> None:
-        self._on_threat: List[tuple[str, ThreatHandler]] = []  # (min_level, handler)
-        self._on_block: List[ThreatHandler] = []
-
-    def add_threat_handler(self, handler: ThreatHandler, min_level: str = "low") -> None:
-        self._on_threat.append((min_level, handler))
-
-    def add_block_handler(self, handler: ThreatHandler) -> None:
-        self._on_block.append(handler)
-
-    async def fire_threat(self, decision: ShieldDecision) -> None:
-        if not decision.threats_detected:
-            return
-        level_order = ["none", "low", "medium", "high", "critical"]
-        max_level = decision.max_threat_level.value
-        for min_level, handler in self._on_threat:
-            if level_order.index(max_level) >= level_order.index(min_level):
-                try:
-                    await handler(decision)
-                except Exception as e:
-                    logger.warning("[ZugaShield] Event hook error: %s", e)
-
-    async def fire_block(self, decision: ShieldDecision) -> None:
-        for handler in self._on_block:
-            try:
-                await handler(decision)
-            except Exception as e:
-                logger.warning("[ZugaShield] Block hook error: %s", e)
-
-
-# =============================================================================
-# Sync wrapper helper
-# =============================================================================
-
-def _run_sync(coro: Coroutine) -> Any:
-    """Run an async coroutine synchronously."""
+def _run_sync(coro):
+    """Run a coroutine synchronously, even from inside a running event loop."""
     try:
-        loop = asyncio.get_running_loop()
+        asyncio.get_running_loop()
     except RuntimeError:
-        loop = None
-
-    if loop is not None and loop.is_running():
-        # We're inside an async context — use a thread
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            return pool.submit(asyncio.run, coro).result()
-    else:
         return asyncio.run(coro)
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, coro).result()
 
 
-# =============================================================================
+# Module-level singleton
+_singleton: Optional[ZugaShield] = None
+_approval_provider: Optional[Callable] = None
+
+# Layers that ALWAYS fail closed regardless of the config setting
+_ALWAYS_FAIL_CLOSED = {"tool_guard", "wallet_fortress"}
+
+
+# ===================================================================
 # Main facade
-# =============================================================================
+# ===================================================================
 
 
 class ZugaShield:
-    """
-    Main facade for the ZugaShield security system.
-
-    Provides a clean API for each integration point. Supports both
-    async and sync usage, builder pattern configuration, and event hooks.
-    """
+    """Main facade for the ZugaShield AI Agent Security System."""
 
     def __init__(self, config: Optional[ShieldConfig] = None) -> None:
         self._config = config or ShieldConfig.from_env()
-        self._catalog = ThreatCatalog(
-            verify_integrity=self._config.verify_signatures,
-        )
+        self._catalog = ThreatCatalog(verify_integrity=self._config.verify_signatures)
         self._audit = ShieldAuditLogger()
-        self._hooks = _EventHooks()
-        self._custom_layers: List[Any] = []
-
-        # Initialize all layers
-        self.perimeter = PerimeterLayer(self._config, self._catalog)
-        self.prompt_armor = PromptArmorLayer(self._config, self._catalog)
-        self.tool_guard = ToolGuardLayer(self._config, self._catalog)
-        self.memory_sentinel = MemorySentinelLayer(self._config, self._catalog)
-        self.exfiltration_guard = ExfiltrationGuardLayer(self._config, self._catalog)
-        self.anomaly_detector = AnomalyDetectorLayer(self._config)
-        self.wallet_fortress = WalletFortressLayer(self._config, self._catalog)
-        self.multimodal = MultimodalScanner(self._config, self._catalog)
-        self.llm_judge = LLMJudgeLayer(self._config)
-
-        # New optional layers (lazy init — only if enabled)
-        self._code_scanner = None
-        self._cot_auditor = None
-        self._mcp_guard = None
-        self._init_optional_layers()
+        self._threat_hooks: List[Tuple[str, Callable]] = []
+        self._block_hooks: List[Callable] = []
+        self._layers: Dict[str, Any] = {}
+        self._updater = None
+        self._init_layers()
+        self._init_feed()
 
         logger.info(
-            "[ZugaShield] v%s initialized: %d signatures, fail_closed=%s",
-            __version__,
-            self._catalog._total_signatures,
-            self._config.fail_closed,
+            "[ZugaShield] v%s initialized: %d layers active, %d signatures loaded",
+            self.version,
+            len(self._layers),
+            self._catalog.get_stats()["total_signatures"],
         )
 
-    def _init_optional_layers(self) -> None:
-        """Initialize optional layers if enabled and available."""
-        if self._config.code_scanner_enabled:
-            try:
-                from zugashield.layers.code_scanner import CodeScannerLayer
-                self._code_scanner = CodeScannerLayer(self._config)
-            except ImportError:
-                pass
+    # ---------------------------------------------------------------
+    # Layer initialization
+    # ---------------------------------------------------------------
 
-        if self._config.cot_auditor_enabled:
-            try:
-                from zugashield.layers.cot_auditor import CoTAuditorLayer
-                self._cot_auditor = CoTAuditorLayer(self._config)
-            except ImportError:
-                pass
+    def _init_layers(self) -> None:
+        cfg, cat = self._config, self._catalog
 
-        if self._config.mcp_guard_enabled:
-            try:
-                from zugashield.layers.mcp_guard import MCPGuardLayer
-                self._mcp_guard = MCPGuardLayer(self._config)
-            except ImportError:
-                pass
+        # Core layers (always importable)
+        if cfg.perimeter_enabled:
+            self._layers["perimeter"] = PerimeterLayer(cfg, cat)
+        if cfg.prompt_armor_enabled:
+            self._layers["prompt_armor"] = PromptArmorLayer(cfg, cat)
+        if cfg.tool_guard_enabled:
+            self._layers["tool_guard"] = ToolGuardLayer(cfg, cat)
+        if cfg.memory_sentinel_enabled:
+            self._layers["memory_sentinel"] = MemorySentinelLayer(cfg, cat)
+        if cfg.exfiltration_guard_enabled:
+            self._layers["exfiltration_guard"] = ExfiltrationGuardLayer(cfg, cat)
+        if cfg.anomaly_detector_enabled:
+            self._layers["anomaly_detector"] = AnomalyDetectorLayer(cfg)
+        if cfg.wallet_fortress_enabled:
+            self._layers["wallet_fortress"] = WalletFortressLayer(cfg, cat)
+        if cfg.llm_judge_enabled:
+            self._layers["llm_judge"] = LLMJudgeLayer(cfg)
 
-    # =========================================================================
-    # Builder pattern
-    # =========================================================================
+        # Optional layers (may not be installable)
+        _optional = [
+            ("ml_detector", cfg.ml_detector_enabled, _HAS_ML_DETECTOR, lambda: MLDetectorLayer(cfg)),
+            ("code_scanner", cfg.code_scanner_enabled, _HAS_CODE_SCANNER, lambda: CodeScannerLayer(cfg)),
+            ("cot_auditor", cfg.cot_auditor_enabled, _HAS_COT_AUDITOR, lambda: CoTAuditorLayer(cfg)),
+            ("mcp_guard", cfg.mcp_guard_enabled, _HAS_MCP_GUARD, lambda: MCPGuardLayer(cfg)),
+        ]
+        for name, enabled, available, factory in _optional:
+            if enabled and available:
+                try:
+                    self._layers[name] = factory()
+                except Exception as e:
+                    logger.warning("[ZugaShield] %s init failed (degrading gracefully): %s", name, e)
 
-    @classmethod
-    def builder(cls) -> _ZugaShieldBuilder:
-        """Create a builder for fluent shield configuration."""
-        return _ZugaShieldBuilder()
+    def _init_feed(self) -> None:
+        """Start the signature auto-updater daemon if feed is enabled."""
+        if not self._config.feed_enabled:
+            return
+        try:
+            from zugashield.feed.updater import SignatureUpdater
 
-    # =========================================================================
-    # Event hooks
-    # =========================================================================
+            self._updater = SignatureUpdater(self._catalog, self._config)
+            self._updater.start()
+            logger.info("[ZugaShield] Signature feed updater started")
+        except ImportError:
+            logger.debug("[ZugaShield] Feed module not available, skipping auto-update")
+        except Exception as e:
+            logger.warning("[ZugaShield] Feed updater init failed: %s", e)
 
-    def on_threat(self, min_level: str = "low") -> Callable:
-        """Decorator to register a threat event handler.
-
-        Usage::
-
-            @shield.on_threat(min_level="high")
-            async def alert_slack(decision):
-                ...
-        """
-        def decorator(fn: ThreatHandler) -> ThreatHandler:
-            self._hooks.add_threat_handler(fn, min_level)
-            return fn
-        return decorator
-
-    def on_block(self, fn: ThreatHandler) -> ThreatHandler:
-        """Decorator to register a block event handler.
-
-        Usage::
-
-            @shield.on_block
-            async def log_to_siem(decision):
-                ...
-        """
-        self._hooks.add_block_handler(fn)
-        return fn
-
-    # =========================================================================
-    # Custom layer registration
-    # =========================================================================
-
-    def register_layer(self, layer: Any) -> None:
-        """Register a custom layer for inclusion in checks."""
-        self._custom_layers.append(layer)
-
-    # =========================================================================
+    # ---------------------------------------------------------------
     # Properties
-    # =========================================================================
+    # ---------------------------------------------------------------
 
     @property
     def enabled(self) -> bool:
@@ -275,6 +209,10 @@ class ZugaShield:
         return self._config
 
     @property
+    def version(self) -> str:
+        return __version__
+
+    @property
     def catalog(self) -> ThreatCatalog:
         return self._catalog
 
@@ -282,61 +220,38 @@ class ZugaShield:
     def audit(self) -> ShieldAuditLogger:
         return self._audit
 
+    # Layer accessors — used by tests and advanced callers
     @property
-    def version(self) -> str:
-        return __version__
+    def perimeter(self):
+        return self._layers.get("perimeter")
 
-    # =========================================================================
-    # Fail-closed layer runner (Fix #1)
-    # =========================================================================
+    @property
+    def prompt_armor(self):
+        return self._layers.get("prompt_armor")
 
-    async def _run_layer(
-        self,
-        layer_name: str,
-        coro: Coroutine[Any, Any, ShieldDecision],
-        *,
-        always_fail_closed: bool = False,
-    ) -> ShieldDecision:
-        """
-        Run a layer check with fail-closed exception handling.
+    @property
+    def tool_guard(self):
+        return self._layers.get("tool_guard")
 
-        If ``fail_closed`` is True in config (or ``always_fail_closed`` is set),
-        any exception from the layer returns BLOCK instead of ALLOW.
-        Wallet and tool execution layers always fail closed.
-        """
-        try:
-            decision = await coro
-            # Fire event hooks
-            if decision.threats_detected:
-                await self._hooks.fire_threat(decision)
-            if decision.is_blocked:
-                await self._hooks.fire_block(decision)
-            return decision
-        except Exception as e:
-            fail_closed = always_fail_closed or self._config.fail_closed
-            if fail_closed:
-                logger.error(
-                    "[ZugaShield] Layer '%s' threw %s — BLOCKING (fail-closed): %s",
-                    layer_name, type(e).__name__, e,
-                )
-                return block_decision(
-                    layer=layer_name,
-                    category=ThreatCategory.BEHAVIORAL_ANOMALY,
-                    level=ThreatLevel.HIGH,
-                    description=f"Layer '{layer_name}' failed — blocked under fail-closed policy",
-                    evidence=f"{type(e).__name__}: {str(e)[:200]}",
-                    signature_id="SYS-FAIL-CLOSED",
-                )
-            else:
-                logger.warning(
-                    "[ZugaShield] Layer '%s' threw %s — allowing (fail-open): %s",
-                    layer_name, type(e).__name__, e,
-                )
-                return allow_decision(layer_name)
+    @property
+    def memory_sentinel(self):
+        return self._layers.get("memory_sentinel")
 
-    # =========================================================================
-    # Layer 1: Perimeter (HTTP middleware)
-    # =========================================================================
+    @property
+    def exfiltration_guard(self):
+        return self._layers.get("exfiltration_guard")
+
+    @property
+    def anomaly_detector(self):
+        return self._layers.get("anomaly_detector")
+
+    @property
+    def wallet_fortress(self):
+        return self._layers.get("wallet_fortress")
+
+    # ---------------------------------------------------------------
+    # Core check methods
+    # ---------------------------------------------------------------
 
     async def check_request(
         self,
@@ -347,222 +262,229 @@ class ZugaShield:
         headers: Optional[Dict[str, str]] = None,
         client_ip: str = "unknown",
     ) -> ShieldDecision:
-        """Check an incoming HTTP request (Layer 1)."""
-        if not self._config.enabled:
-            return allow_decision("shield_disabled")
+        """Check an incoming HTTP request through the perimeter layer (L1)."""
+        if not self.enabled:
+            return allow_decision("perimeter")
 
-        decision = await self._run_layer(
-            "perimeter",
-            self.perimeter.check(
-                path=path, method=method, content_length=content_length,
-                body=body, headers=headers, client_ip=client_ip,
-            ),
-        )
-        self._audit.log(decision, {"path": path, "method": method, "client_ip": client_ip})
-        self._feed_anomaly(decision)
+        start = time.perf_counter()
+        layer = self._layers.get("perimeter")
+        if not layer:
+            return allow_decision("perimeter")
+
+        try:
+            decision = await layer.check(
+                path=path,
+                method=method,
+                content_length=content_length,
+                body=body,
+                headers=headers,
+                client_ip=client_ip,
+            )
+        except Exception as e:
+            decision = self._handle_layer_error("perimeter", e)
+
+        decision.elapsed_ms = (time.perf_counter() - start) * 1000
+        self._audit.log(decision)
+        await self._fire_hooks(decision)
         return decision
-
-    def check_request_sync(self, **kwargs: Any) -> ShieldDecision:
-        """Synchronous wrapper for check_request."""
-        return _run_sync(self.check_request(**kwargs))
-
-    # =========================================================================
-    # Layer 2: Prompt Armor (injection defense)
-    # =========================================================================
 
     async def check_prompt(
         self,
-        user_message: str,
+        text: str,
         context: Optional[Dict] = None,
     ) -> ShieldDecision:
-        """Check user message for prompt injection (Layer 2)."""
-        if not self._config.enabled:
-            return allow_decision("shield_disabled")
+        """Check a prompt through prompt armor (L2), ML detector, and anomaly gate (L6)."""
+        if not self.enabled:
+            return allow_decision("prompt_armor")
 
-        decision = await self._run_layer(
-            "prompt_armor",
-            self.prompt_armor.check(user_message, context),
-        )
+        start = time.perf_counter()
+        ctx = context or {}
+        session_id = ctx.get("session_id", "default")
 
-        # Optional LLM judge escalation for ambiguous cases
-        if self.llm_judge.should_escalate(decision):
-            decision = await self._run_layer(
-                "llm_judge",
-                self.llm_judge.judge(user_message, decision),
-            )
+        # L2 — Prompt Armor (signature-based, fast regex scan)
+        layer = self._layers.get("prompt_armor")
+        if layer:
+            try:
+                decision = await layer.check(text, context=ctx)
+            except Exception as e:
+                decision = self._handle_layer_error("prompt_armor", e)
+            if decision.is_blocked:
+                decision.elapsed_ms = (time.perf_counter() - start) * 1000
+                self._record_anomaly(session_id, decision)
+                self._audit.log(decision, context=ctx)
+                await self._fire_hooks(decision)
+                return decision
 
-        self._audit.log(decision, {"source": "prompt", **(context or {})})
-        self._feed_anomaly(decision)
-        return decision
+        # ML Detector (optional — neural injection detection)
+        ml = self._layers.get("ml_detector")
+        if ml:
+            try:
+                decision = await ml.check(text)
+            except Exception as e:
+                decision = self._handle_layer_error("ml_detector", e)
+            if decision.is_blocked:
+                decision.elapsed_ms = (time.perf_counter() - start) * 1000
+                self._record_anomaly(session_id, decision)
+                self._audit.log(decision, context=ctx)
+                await self._fire_hooks(decision)
+                return decision
 
-    def check_prompt_sync(self, user_message: str, context: Optional[Dict] = None) -> ShieldDecision:
-        """Synchronous wrapper for check_prompt."""
-        return _run_sync(self.check_prompt(user_message, context))
+        # L6 — Anomaly score gate (cumulative session risk)
+        anomaly = self._layers.get("anomaly_detector")
+        if anomaly:
+            try:
+                decision = await anomaly.check(session_id=session_id)
+            except Exception as e:
+                decision = self._handle_layer_error("anomaly_detector", e)
+            if decision.is_blocked:
+                decision.elapsed_ms = (time.perf_counter() - start) * 1000
+                self._audit.log(decision, context=ctx)
+                await self._fire_hooks(decision)
+                return decision
 
-    # =========================================================================
-    # Layer 3: Tool Guard (execution gating)
-    # =========================================================================
+        result = allow_decision("prompt_armor")
+        result.elapsed_ms = (time.perf_counter() - start) * 1000
+        self._audit.log(result, context=ctx)
+        return result
+
+    async def check_output(
+        self,
+        text: str,
+        context: Optional[Dict] = None,
+    ) -> ShieldDecision:
+        """Check AI output through exfiltration guard (L5) and CoT auditor."""
+        if not self.enabled:
+            return allow_decision("exfiltration_guard")
+
+        start = time.perf_counter()
+        ctx = context or {}
+
+        # L5 — Exfiltration Guard
+        layer = self._layers.get("exfiltration_guard")
+        if layer:
+            try:
+                decision = await layer.check(text, context=ctx)
+            except Exception as e:
+                decision = self._handle_layer_error("exfiltration_guard", e)
+            if decision.is_blocked:
+                decision.elapsed_ms = (time.perf_counter() - start) * 1000
+                self._audit.log(decision, context=ctx)
+                await self._fire_hooks(decision)
+                return decision
+
+        # CoT Auditor (optional — checks reasoning traces for deception)
+        cot = self._layers.get("cot_auditor")
+        if cot:
+            try:
+                decision = await cot.check(trace=text, stated_goal=ctx.get("task", ""))
+            except Exception as e:
+                decision = self._handle_layer_error("cot_auditor", e)
+            if decision.is_blocked:
+                decision.elapsed_ms = (time.perf_counter() - start) * 1000
+                self._audit.log(decision, context=ctx)
+                await self._fire_hooks(decision)
+                return decision
+
+        result = allow_decision("exfiltration_guard")
+        result.elapsed_ms = (time.perf_counter() - start) * 1000
+        self._audit.log(result, context=ctx)
+        return result
 
     async def check_tool_call(
         self,
-        tool_name: str,
-        params: Dict[str, Any],
+        name: str,
+        args: Optional[Dict[str, Any]] = None,
         session_id: str = "default",
     ) -> ShieldDecision:
-        """Check a tool call before execution (Layer 3). Always fail-closed."""
-        if not self._config.enabled:
-            return allow_decision("shield_disabled")
+        """Check a tool invocation through tool guard (L3) and anomaly detector (L6)."""
+        if not self.enabled:
+            return allow_decision("tool_guard")
 
-        decision = await self._run_layer(
-            "tool_guard",
-            self.tool_guard.check(tool_name, params, session_id),
-            always_fail_closed=True,
-        )
-        self._audit.log(decision, {"tool": tool_name, "session_id": session_id})
-        self._feed_anomaly(decision, session_id)
-        return decision
+        start = time.perf_counter()
+        params = args or {}
 
-    def check_tool_call_sync(self, tool_name: str, params: Dict[str, Any], session_id: str = "default") -> ShieldDecision:
-        """Synchronous wrapper for check_tool_call."""
-        return _run_sync(self.check_tool_call(tool_name, params, session_id))
+        # L3 — Tool Guard (ALWAYS fail-closed regardless of config)
+        layer = self._layers.get("tool_guard")
+        if layer:
+            try:
+                decision = await layer.check(name, params, session_id=session_id)
+            except Exception as e:
+                decision = self._handle_layer_error("tool_guard", e, force_block=True)
+            if decision.is_blocked:
+                decision.elapsed_ms = (time.perf_counter() - start) * 1000
+                self._record_anomaly(session_id, decision)
+                self._audit.log(decision)
+                await self._fire_hooks(decision)
+                return decision
 
-    # =========================================================================
-    # Layer 4: Memory Sentinel (write + read paths)
-    # =========================================================================
+        # L6 — Anomaly score gate
+        anomaly = self._layers.get("anomaly_detector")
+        if anomaly:
+            try:
+                decision = await anomaly.check(session_id=session_id)
+            except Exception as e:
+                decision = self._handle_layer_error("anomaly_detector", e)
+            if decision.is_blocked:
+                decision.elapsed_ms = (time.perf_counter() - start) * 1000
+                self._audit.log(decision)
+                await self._fire_hooks(decision)
+                return decision
+
+        result = allow_decision("tool_guard")
+        result.elapsed_ms = (time.perf_counter() - start) * 1000
+        self._audit.log(result)
+        return result
 
     async def check_memory_write(
         self,
         content: str,
         memory_type: str = "",
-        importance: str = "",
         source: str = "unknown",
-        user_id: str = "default",
         tags: Optional[List[str]] = None,
     ) -> ShieldDecision:
-        """Check memory content before storage (Layer 4 write)."""
-        if not self._config.enabled:
-            return allow_decision("shield_disabled")
+        """Check a memory write through memory sentinel (L4)."""
+        if not self.enabled:
+            return allow_decision("memory_sentinel")
 
-        decision = await self._run_layer(
-            "memory_sentinel",
-            self.memory_sentinel.check_write(
-                content=content, memory_type=memory_type, importance=importance,
-                source=source, user_id=user_id, tags=tags,
-            ),
-        )
-        self._audit.log(decision, {"source": source, "memory_type": memory_type})
-        self._feed_anomaly(decision)
+        start = time.perf_counter()
+        layer = self._layers.get("memory_sentinel")
+        if not layer:
+            return allow_decision("memory_sentinel")
+
+        try:
+            decision = await layer.check_write(
+                content, memory_type=memory_type, source=source, tags=tags,
+            )
+        except Exception as e:
+            decision = self._handle_layer_error("memory_sentinel", e)
+
+        decision.elapsed_ms = (time.perf_counter() - start) * 1000
+        self._audit.log(decision)
+        await self._fire_hooks(decision)
         return decision
-
-    def check_memory_write_sync(self, **kwargs: Any) -> ShieldDecision:
-        """Synchronous wrapper for check_memory_write."""
-        return _run_sync(self.check_memory_write(**kwargs))
 
     async def check_memory_recall(
         self,
         memories: List[Dict[str, Any]],
     ) -> ShieldDecision:
-        """Check recalled memories before prompt injection (Layer 4 read)."""
-        if not self._config.enabled:
-            return allow_decision("shield_disabled")
+        """Check recalled memories through memory sentinel (L4)."""
+        if not self.enabled:
+            return allow_decision("memory_sentinel")
 
-        decision = await self._run_layer(
-            "memory_sentinel",
-            self.memory_sentinel.check_recall(memories),
-        )
-        self._audit.log(decision, {"memory_count": len(memories)})
+        start = time.perf_counter()
+        layer = self._layers.get("memory_sentinel")
+        if not layer:
+            return allow_decision("memory_sentinel")
+
+        try:
+            decision = await layer.check_recall(memories)
+        except Exception as e:
+            decision = self._handle_layer_error("memory_sentinel", e)
+
+        decision.elapsed_ms = (time.perf_counter() - start) * 1000
+        self._audit.log(decision)
+        await self._fire_hooks(decision)
         return decision
-
-    def check_memory_recall_sync(self, memories: List[Dict[str, Any]]) -> ShieldDecision:
-        """Synchronous wrapper for check_memory_recall."""
-        return _run_sync(self.check_memory_recall(memories))
-
-    # =========================================================================
-    # Layer 4b: RAG Document Pre-Ingestion Scanning
-    # =========================================================================
-
-    async def check_document(
-        self,
-        content: str,
-        source: str = "external",
-        document_type: str = "",
-    ) -> ShieldDecision:
-        """Check an external document before RAG ingestion (Layer 4)."""
-        if not self._config.enabled:
-            return allow_decision("shield_disabled")
-
-        decision = await self._run_layer(
-            "memory_sentinel",
-            self.memory_sentinel.check_document(
-                content=content, source=source, document_type=document_type,
-            ),
-        )
-        self._audit.log(decision, {"source": source, "document_type": document_type})
-        self._feed_anomaly(decision)
-        return decision
-
-    def check_document_sync(self, content: str, source: str = "external", document_type: str = "") -> ShieldDecision:
-        """Synchronous wrapper for check_document."""
-        return _run_sync(self.check_document(content, source, document_type))
-
-    # =========================================================================
-    # Layer 5: Exfiltration Guard (output DLP)
-    # =========================================================================
-
-    async def check_output(
-        self,
-        output: str,
-        context: Optional[Dict] = None,
-    ) -> ShieldDecision:
-        """Check LLM response or tool output for data leakage (Layer 5)."""
-        if not self._config.enabled:
-            return allow_decision("shield_disabled")
-
-        decision = await self._run_layer(
-            "exfiltration_guard",
-            self.exfiltration_guard.check(output, context),
-        )
-        self._audit.log(decision, context)
-        self._feed_anomaly(decision)
-        return decision
-
-    def check_output_sync(self, output: str, context: Optional[Dict] = None) -> ShieldDecision:
-        """Synchronous wrapper for check_output."""
-        return _run_sync(self.check_output(output, context))
-
-    # =========================================================================
-    # Multimodal: Image-Based Injection Detection
-    # =========================================================================
-
-    async def check_image(
-        self,
-        image_path: Optional[str] = None,
-        alt_text: Optional[str] = None,
-        ocr_text: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> ShieldDecision:
-        """Check an image for injection payloads (multimodal defense)."""
-        if not self._config.enabled:
-            return allow_decision("shield_disabled")
-
-        decision = await self._run_layer(
-            "multimodal",
-            self.multimodal.check_image(
-                image_path=image_path, alt_text=alt_text,
-                ocr_text=ocr_text, metadata=metadata,
-            ),
-        )
-        self._audit.log(decision, {"source": "image"})
-        self._feed_anomaly(decision)
-        return decision
-
-    def check_image_sync(self, **kwargs: Any) -> ShieldDecision:
-        """Synchronous wrapper for check_image."""
-        return _run_sync(self.check_image(**kwargs))
-
-    # =========================================================================
-    # Layer 7: Wallet Fortress (crypto protection). Always fail-closed.
-    # =========================================================================
 
     async def check_transaction(
         self,
@@ -573,379 +495,415 @@ class ZugaShield:
         contract_data: Optional[str] = None,
         function_sig: Optional[str] = None,
     ) -> ShieldDecision:
-        """Check a wallet transaction (Layer 7). Always fail-closed."""
-        if not self._config.enabled:
-            return allow_decision("shield_disabled")
+        """Check a crypto transaction through wallet fortress (L7). Always fail-closed."""
+        if not self.enabled:
+            return allow_decision("wallet_fortress")
 
-        decision = await self._run_layer(
-            "wallet_fortress",
-            self.wallet_fortress.check(
-                tx_type=tx_type, to_address=to_address, amount=amount,
-                amount_usd=amount_usd, contract_data=contract_data,
+        start = time.perf_counter()
+        layer = self._layers.get("wallet_fortress")
+        if not layer:
+            return allow_decision("wallet_fortress")
+
+        try:
+            decision = await layer.check(
+                tx_type=tx_type,
+                to_address=to_address,
+                amount=amount,
+                amount_usd=amount_usd,
+                contract_data=contract_data,
                 function_sig=function_sig,
-            ),
-            always_fail_closed=True,
-        )
-        self._audit.log(decision, {"tx_type": tx_type, "amount_usd": amount_usd})
-        self._feed_anomaly(decision)
+            )
+        except Exception as e:
+            decision = self._handle_layer_error("wallet_fortress", e, force_block=True)
+
+        decision.elapsed_ms = (time.perf_counter() - start) * 1000
+        self._audit.log(decision)
+        await self._fire_hooks(decision)
         return decision
-
-    def check_transaction_sync(self, **kwargs: Any) -> ShieldDecision:
-        """Synchronous wrapper for check_transaction."""
-        return _run_sync(self.check_transaction(**kwargs))
-
-    # =========================================================================
-    # NEW: Code Scanner (LLM-generated code safety)
-    # =========================================================================
 
     async def check_code(
         self,
         code: str,
         language: str = "python",
     ) -> ShieldDecision:
-        """Check LLM-generated code for security vulnerabilities."""
-        if not self._config.enabled:
-            return allow_decision("shield_disabled")
-        if self._code_scanner is None:
-            return allow_decision("code_scanner_not_available")
+        """Check code through the code scanner layer."""
+        if not self.enabled:
+            return allow_decision("code_scanner")
 
-        decision = await self._run_layer(
-            "code_scanner",
-            self._code_scanner.check(code, language=language),
-        )
-        self._audit.log(decision, {"language": language})
-        self._feed_anomaly(decision)
+        start = time.perf_counter()
+        layer = self._layers.get("code_scanner")
+        if not layer:
+            return allow_decision("code_scanner")
+
+        try:
+            decision = await layer.check(code, language=language)
+        except Exception as e:
+            decision = self._handle_layer_error("code_scanner", e)
+
+        decision.elapsed_ms = (time.perf_counter() - start) * 1000
+        self._audit.log(decision)
+        await self._fire_hooks(decision)
         return decision
-
-    def check_code_sync(self, code: str, language: str = "python") -> ShieldDecision:
-        """Synchronous wrapper for check_code."""
-        return _run_sync(self.check_code(code, language))
-
-    # =========================================================================
-    # NEW: CoT Auditor (chain-of-thought trace analysis)
-    # =========================================================================
 
     async def check_reasoning(
         self,
         trace: str,
         stated_goal: str = "",
     ) -> ShieldDecision:
-        """Audit a chain-of-thought trace for deceptive patterns."""
-        if not self._config.enabled:
-            return allow_decision("shield_disabled")
-        if self._cot_auditor is None:
-            return allow_decision("cot_auditor_not_available")
+        """Check a reasoning trace through the CoT auditor layer."""
+        if not self.enabled:
+            return allow_decision("cot_auditor")
 
-        decision = await self._run_layer(
-            "cot_auditor",
-            self._cot_auditor.check(trace, stated_goal=stated_goal),
-        )
-        self._audit.log(decision, {"stated_goal": stated_goal[:100]})
-        self._feed_anomaly(decision)
+        start = time.perf_counter()
+        layer = self._layers.get("cot_auditor")
+        if not layer:
+            return allow_decision("cot_auditor")
+
+        try:
+            decision = await layer.check(trace=trace, stated_goal=stated_goal)
+        except Exception as e:
+            decision = self._handle_layer_error("cot_auditor", e)
+
+        decision.elapsed_ms = (time.perf_counter() - start) * 1000
+        self._audit.log(decision)
+        await self._fire_hooks(decision)
         return decision
 
-    def check_reasoning_sync(self, trace: str, stated_goal: str = "") -> ShieldDecision:
-        """Synchronous wrapper for check_reasoning."""
-        return _run_sync(self.check_reasoning(trace, stated_goal))
+    async def check_document(
+        self,
+        content: str,
+        source: str = "external",
+        document_type: str = "",
+    ) -> ShieldDecision:
+        """Check an external document (RAG) through memory sentinel (L4)."""
+        if not self.enabled:
+            return allow_decision("memory_sentinel")
 
-    # =========================================================================
-    # Cross-layer: Anomaly Detection (Layer 6)
-    # =========================================================================
+        start = time.perf_counter()
+        layer = self._layers.get("memory_sentinel")
+        if not layer:
+            return allow_decision("memory_sentinel")
 
-    def get_session_risk(self, session_id: str = "default") -> AnomalyScore:
-        """Get current anomaly score for a session."""
-        return self.anomaly_detector.get_session_score(session_id)
+        try:
+            decision = await layer.check_document(content, source=source, document_type=document_type)
+        except Exception as e:
+            decision = self._handle_layer_error("memory_sentinel", e)
 
-    def get_audit_log(self, limit: int = 100, layer: Optional[str] = None) -> List[Dict]:
-        """Get recent audit events."""
-        return self._audit.get_recent(limit=limit, layer=layer)
+        decision.elapsed_ms = (time.perf_counter() - start) * 1000
+        self._audit.log(decision)
+        await self._fire_hooks(decision)
+        return decision
 
-    def get_dashboard_data(self) -> Dict:
-        """Get aggregated data for the security dashboard."""
-        data: Dict[str, Any] = {
-            "version": __version__,
-            "enabled": self._config.enabled,
-            "strict_mode": self._config.strict_mode,
-            "fail_closed": self._config.fail_closed,
-            "catalog": self._catalog.get_stats(),
-            "audit": self._audit.get_stats(),
-            "layers": {
-                "perimeter": self.perimeter.get_stats(),
-                "prompt_armor": self.prompt_armor.get_stats(),
-                "tool_guard": self.tool_guard.get_stats(),
-                "memory_sentinel": self.memory_sentinel.get_stats(),
-                "exfiltration_guard": self.exfiltration_guard.get_stats(),
-                "anomaly_detector": self.anomaly_detector.get_stats(),
-                "wallet_fortress": self.wallet_fortress.get_stats(),
-                "llm_judge": self.llm_judge.get_stats(),
-            },
-        }
-        if self._code_scanner:
-            data["layers"]["code_scanner"] = self._code_scanner.get_stats()
-        if self._cot_auditor:
-            data["layers"]["cot_auditor"] = self._cot_auditor.get_stats()
-        if self._mcp_guard:
-            data["layers"]["mcp_guard"] = self._mcp_guard.get_stats()
-        return data
+    async def check_image(
+        self,
+        alt_text: str = "",
+        **kwargs: Any,
+    ) -> ShieldDecision:
+        """Check image metadata (alt text) for injection through prompt armor (L2)."""
+        if not self.enabled:
+            return allow_decision("prompt_armor")
 
-    # =========================================================================
-    # Tool Definition Scanning (MCP injection defense)
-    # =========================================================================
+        if alt_text:
+            return await self.check_prompt(alt_text, context={"source": "image_alt_text"})
+
+        return allow_decision("prompt_armor")
 
     def scan_tool_definitions(
         self,
         tools: List[Dict[str, Any]],
+        server_id: str = "default",
     ) -> List[Dict[str, Any]]:
-        """
-        Scan tool definitions for injection payloads before sending to LLM.
-
-        Addresses CVE-2025-53773: malicious instructions hidden in tool
-        descriptions, parameter descriptions, or tool metadata.
-
-        If the MCP Guard layer is available, delegates to it for richer analysis.
-        Otherwise falls back to inline regex scanning.
-        """
-        if not self._config.enabled or not self._config.prompt_armor_enabled:
+        """Strip poisoned MCP tool definitions. Returns the clean list only."""
+        layer = self._layers.get("mcp_guard")
+        if not layer or not self.enabled:
             return tools
+        clean, _threats = layer.scan_definitions(tools, server_id=server_id)
+        return clean
 
-        # Prefer MCPGuardLayer if available
-        if self._mcp_guard is not None:
-            clean_tools, threats = self._mcp_guard.scan_definitions(tools)
-            for threat in threats:
-                self._audit.log(
-                    ShieldDecision(
-                        verdict=ShieldVerdict.BLOCK,
-                        threats_detected=[threat],
-                        layer="mcp_guard",
-                        elapsed_ms=0.0,
-                    ),
-                    {"source": "tool_definition_scan"},
-                )
-            return clean_tools
+    # ---------------------------------------------------------------
+    # Query / dashboard
+    # ---------------------------------------------------------------
 
-        # Fallback: inline regex scanning
-        return self._scan_tool_definitions_inline(tools)
+    def get_session_risk(self, session_id: str = "default") -> AnomalyScore:
+        """Get the anomaly score for a session."""
+        layer = self._layers.get("anomaly_detector")
+        if layer:
+            return layer.get_session_score(session_id)
+        return AnomalyScore()
 
-    def _scan_tool_definitions_inline(self, tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Inline tool definition scanning (fallback when MCPGuardLayer unavailable)."""
-        clean_tools = []
-        injection_keywords = re.compile(
-            r"(?:ignore|override|bypass|disable)\s+(?:all\s+)?(?:previous|prior|safety|security|filter|restriction|instruction|rule|guideline)",
-            re.I,
-        )
-        hidden_instruction = re.compile(
-            r"(?:actually|really|instead|secretly|hidden)\s*[,:]?\s*(?:you\s+)?(?:should|must|will|need\s+to)\s+(?:ignore|override|execute|bypass|follow\s+these)",
-            re.I,
-        )
-        role_override = re.compile(
-            r"(?:you\s+are\s+now|act\s+as|pretend\s+to\s+be|switch\s+to)\s+(?:a\s+)?(?:unrestricted|unfiltered|jailbroken|evil|DAN)",
-            re.I,
-        )
+    def get_audit_log(self, limit: int = 100, layer: Optional[str] = None) -> List[Dict]:
+        """Get recent audit events, optionally filtered by layer."""
+        return self._audit.get_recent(limit=limit, layer=layer)
 
-        for tool in tools:
-            flagged = False
-            tool_name = tool.get("name", "unknown")
-
-            texts_to_scan = []
-            if "description" in tool:
-                texts_to_scan.append(("description", tool["description"]))
-
-            schema = tool.get("input_schema", {})
-            for param_name, param_def in schema.get("properties", {}).items():
-                if "description" in param_def:
-                    texts_to_scan.append((f"param:{param_name}", param_def["description"]))
-
-            for field_name, text in texts_to_scan:
-                for pattern, desc in [
-                    (injection_keywords, "injection keyword"),
-                    (hidden_instruction, "hidden instruction"),
-                    (role_override, "role override"),
-                ]:
-                    match = pattern.search(text)
-                    if match:
-                        flagged = True
-                        threat = ThreatDetection(
-                            category=ThreatCategory.TOOL_EXPLOITATION,
-                            level=ThreatLevel.CRITICAL,
-                            verdict=ShieldVerdict.BLOCK,
-                            description=f"Injection in tool definition '{tool_name}' field '{field_name}': {desc}",
-                            evidence=match.group(0)[:200],
-                            layer="tool_definition_scanner",
-                            confidence=0.88,
-                            suggested_action=f"Remove poisoned tool '{tool_name}' from definitions",
-                            signature_id="TDS-INJECT",
-                        )
-                        self._audit.log(
-                            ShieldDecision(
-                                verdict=ShieldVerdict.BLOCK,
-                                threats_detected=[threat],
-                                layer="tool_definition_scanner",
-                                elapsed_ms=0.0,
-                            ),
-                            {"tool_name": tool_name, "field": field_name},
-                        )
-                        logger.warning(
-                            "[ZugaShield] BLOCKED poisoned tool: %s (field=%s)",
-                            tool_name, field_name,
-                        )
-                        break
-                if flagged:
-                    break
-
-            if not flagged:
-                clean_tools.append(tool)
-
-        removed = len(tools) - len(clean_tools)
-        if removed:
-            logger.warning(
-                "[ZugaShield] Removed %d poisoned tool definition(s) from %d total",
-                removed, len(tools),
-            )
-        return clean_tools
-
-    # =========================================================================
-    # Internal helpers
-    # =========================================================================
-
-    def _feed_anomaly(self, decision: ShieldDecision, session_id: str = "default") -> None:
-        """Feed detection events to the anomaly detector for correlation."""
-        for threat in decision.threats_detected:
-            self.anomaly_detector.record_event(session_id, threat)
+    def get_dashboard_data(self) -> Dict[str, Any]:
+        """Aggregated stats for the security dashboard."""
+        layer_stats = {}
+        for name, lyr in self._layers.items():
+            if hasattr(lyr, "get_stats"):
+                layer_stats[name] = lyr.get_stats()
+        data: Dict[str, Any] = {
+            "version": self.version,
+            "enabled": self.enabled,
+            "strict_mode": self._config.strict_mode,
+            "fail_closed": self._config.fail_closed,
+            "catalog": self._catalog.get_stats(),
+            "audit": self._audit.get_stats(),
+            "layers": layer_stats,
+        }
+        # Feed stats (if updater is running)
+        if self._updater is not None:
+            data["feed"] = {
+                "running": self._updater.is_alive(),
+                "updates_applied": getattr(self._updater, "_updates_applied", 0),
+                "last_error": getattr(self._updater, "_last_error", None),
+            }
+        return data
 
     def get_version_state(self) -> Dict[str, Any]:
-        """Snapshot current shield configuration for versioning."""
+        """Version, config summary, and which layers are active."""
         return {
-            "version": __version__,
-            "enabled_layers": {
-                "perimeter": self._config.perimeter_enabled,
-                "prompt_armor": self._config.prompt_armor_enabled,
-                "tool_guard": self._config.tool_guard_enabled,
-                "memory_sentinel": self._config.memory_sentinel_enabled,
-                "exfiltration_guard": self._config.exfiltration_guard_enabled,
-                "anomaly_detector": self._config.anomaly_detector_enabled,
-                "wallet_fortress": self._config.wallet_fortress_enabled,
-                "code_scanner": self._config.code_scanner_enabled,
-                "cot_auditor": self._config.cot_auditor_enabled,
-                "mcp_guard": self._config.mcp_guard_enabled,
-            },
+            "version": self.version,
+            "enabled": self.enabled,
+            "enabled_layers": list(self._layers.keys()),
             "config": {
-                "fail_closed": self._config.fail_closed,
                 "strict_mode": self._config.strict_mode,
+                "fail_closed": self._config.fail_closed,
             },
         }
 
+    # ---------------------------------------------------------------
+    # Event hooks
+    # ---------------------------------------------------------------
 
-# =============================================================================
+    def on_threat(self, min_level: str = "high") -> Callable:
+        """Decorator: fire callback when a threat >= min_level is detected."""
+        def decorator(fn: Callable) -> Callable:
+            self._threat_hooks.append((min_level, fn))
+            return fn
+        return decorator
+
+    def on_block(self, fn: Callable) -> Callable:
+        """Decorator: fire callback on every BLOCK or QUARANTINE verdict."""
+        self._block_hooks.append(fn)
+        return fn
+
+    async def _fire_hooks(self, decision: ShieldDecision) -> None:
+        """Invoke registered event hooks for this decision."""
+        if decision.is_blocked:
+            for hook in self._block_hooks:
+                try:
+                    result = hook(decision)
+                    if asyncio.iscoroutine(result):
+                        await result
+                except Exception:
+                    logger.exception("[ZugaShield] Block hook error")
+
+        _LEVELS = {"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
+        max_lvl = _LEVELS.get(decision.max_threat_level.value, 0)
+        for min_level_str, hook in self._threat_hooks:
+            if max_lvl >= _LEVELS.get(min_level_str, 3):
+                try:
+                    result = hook(decision)
+                    if asyncio.iscoroutine(result):
+                        await result
+                except Exception:
+                    logger.exception("[ZugaShield] Threat hook error")
+
+    # ---------------------------------------------------------------
+    # Sync wrappers (Flask / Django / scripts)
+    # ---------------------------------------------------------------
+
+    def check_prompt_sync(self, text: str, context: Optional[Dict] = None) -> ShieldDecision:
+        """Synchronous check_prompt."""
+        return _run_sync(self.check_prompt(text, context=context))
+
+    def check_output_sync(self, text: str, context: Optional[Dict] = None) -> ShieldDecision:
+        """Synchronous check_output."""
+        return _run_sync(self.check_output(text, context=context))
+
+    def check_tool_call_sync(
+        self, name: str, args: Optional[Dict[str, Any]] = None, session_id: str = "default",
+    ) -> ShieldDecision:
+        """Synchronous check_tool_call."""
+        return _run_sync(self.check_tool_call(name, args, session_id=session_id))
+
+    def check_memory_write_sync(self, content: str, **kwargs: Any) -> ShieldDecision:
+        """Synchronous check_memory_write."""
+        return _run_sync(self.check_memory_write(content, **kwargs))
+
+    def check_transaction_sync(self, **kwargs: Any) -> ShieldDecision:
+        """Synchronous check_transaction."""
+        return _run_sync(self.check_transaction(**kwargs))
+
+    def check_code_sync(self, code: str, language: str = "python") -> ShieldDecision:
+        """Synchronous check_code."""
+        return _run_sync(self.check_code(code, language=language))
+
+    def check_reasoning_sync(self, trace: str, stated_goal: str = "") -> ShieldDecision:
+        """Synchronous check_reasoning."""
+        return _run_sync(self.check_reasoning(trace, stated_goal=stated_goal))
+
+    # ---------------------------------------------------------------
+    # Internals
+    # ---------------------------------------------------------------
+
+    def _record_anomaly(self, session_id: str, decision: ShieldDecision) -> None:
+        """Feed threat detections into the anomaly detector for session scoring."""
+        anomaly = self._layers.get("anomaly_detector")
+        if anomaly and decision.threats_detected:
+            for threat in decision.threats_detected:
+                anomaly.record_event(session_id, threat)
+
+    def _handle_layer_error(
+        self, layer_name: str, error: Exception, *, force_block: bool = False,
+    ) -> ShieldDecision:
+        """On layer error: BLOCK if fail_closed or force_block, else ALLOW."""
+        logger.exception("[ZugaShield] Layer '%s' error", layer_name)
+        should_block = force_block or self._config.fail_closed or layer_name in _ALWAYS_FAIL_CLOSED
+        if should_block:
+            return block_decision(
+                layer=layer_name,
+                category=ThreatCategory.BEHAVIORAL_ANOMALY,
+                level=ThreatLevel.HIGH,
+                description=f"Internal error in {layer_name} (fail-closed)",
+                evidence=str(error)[:100],
+                confidence=0.5,
+                signature_id="SYS-FAIL-CLOSED",
+            )
+        return allow_decision(layer_name)
+
+    # ---------------------------------------------------------------
+    # Builder
+    # ---------------------------------------------------------------
+
+    @classmethod
+    def builder(cls) -> ZugaShieldBuilder:
+        """Create a fluent builder for ZugaShield."""
+        return ZugaShieldBuilder()
+
+
+# ===================================================================
 # Builder
-# =============================================================================
+# ===================================================================
 
 
-class _ZugaShieldBuilder:
-    """Fluent builder for ZugaShield instances."""
+class ZugaShieldBuilder:
+    """Fluent builder that wraps ShieldConfig.builder() and produces a ZugaShield."""
 
     def __init__(self) -> None:
         self._config_builder = ShieldConfig.builder()
+        self._custom_layers: List[BaseLayer] = []
 
-    def fail_closed(self, value: bool = True) -> _ZugaShieldBuilder:
+    def fail_closed(self, value: bool = True) -> ZugaShieldBuilder:
         self._config_builder.fail_closed(value)
         return self
 
-    def strict_mode(self, value: bool = True) -> _ZugaShieldBuilder:
+    def strict_mode(self, value: bool = True) -> ZugaShieldBuilder:
         self._config_builder.strict_mode(value)
         return self
 
-    def enable_layers(self, *layers: str) -> _ZugaShieldBuilder:
+    def enable_layers(self, *layers: str) -> ZugaShieldBuilder:
         self._config_builder.enable_layers(*layers)
         return self
 
-    def disable_layers(self, *layers: str) -> _ZugaShieldBuilder:
+    def disable_layers(self, *layers: str) -> ZugaShieldBuilder:
         self._config_builder.disable_layers(*layers)
         return self
 
     def set_tool_policy(
-        self, tool_name: str, rate: int = 15, approval: bool = False, risk: str = "medium"
-    ) -> _ZugaShieldBuilder:
-        self._config_builder.set_tool_policy(tool_name, rate, approval, risk)
+        self, name: str, rate: int = 15, approval: bool = False, risk: str = "medium",
+    ) -> ZugaShieldBuilder:
+        self._config_builder.set_tool_policy(name, rate, approval, risk)
         return self
 
-    def add_sensitive_endpoint(self, path: str, rate_limit: int = 10) -> _ZugaShieldBuilder:
-        self._config_builder.add_sensitive_endpoint(path, rate_limit)
-        return self
-
-    def set_egress_allowlist(self, *domains: str) -> _ZugaShieldBuilder:
+    def set_egress_allowlist(self, *domains: str) -> ZugaShieldBuilder:
         self._config_builder.set_egress_allowlist(*domains)
         return self
 
     def set_wallet_limits(
-        self, tx_limit: float = 100.0, hourly_limit: float = 500.0, daily_limit: float = 2000.0
-    ) -> _ZugaShieldBuilder:
+        self, tx_limit: float = 100.0, hourly_limit: float = 500.0, daily_limit: float = 2000.0,
+    ) -> ZugaShieldBuilder:
         self._config_builder.set_wallet_limits(tx_limit, hourly_limit, daily_limit)
         return self
 
-    def set_llm_provider(self, provider: str, model: Optional[str] = None) -> _ZugaShieldBuilder:
-        self._config_builder.set_llm_provider(provider, model)
+    def add_sensitive_endpoint(self, path: str, rate_limit: int = 10) -> ZugaShieldBuilder:
+        self._config_builder.add_sensitive_endpoint(path, rate_limit)
         return self
 
-    def add_layer(self, layer: Any) -> _ZugaShieldBuilder:
-        """Register a custom layer to add after build."""
-        if not hasattr(self, "_custom_layers"):
-            self._custom_layers: list = []
+    def enable_feed(
+        self, url: Optional[str] = None, interval: int = 3600,
+    ) -> ZugaShieldBuilder:
+        self._config_builder.enable_feed(url=url, interval=interval)
+        return self
+
+    def add_layer(self, layer: BaseLayer) -> ZugaShieldBuilder:
+        """Register a custom layer to be added after build."""
         self._custom_layers.append(layer)
         return self
 
     def build(self) -> ZugaShield:
         config = self._config_builder.build()
-        shield = ZugaShield(config)
-        for layer in getattr(self, "_custom_layers", []):
-            shield.register_layer(layer)
+        shield = ZugaShield(config=config)
+        for layer in self._custom_layers:
+            name = getattr(layer, "name", type(layer).__name__.lower())
+            shield._layers[name] = layer
         return shield
 
 
-# =============================================================================
-# Singleton
-# =============================================================================
-
-_shield: Optional[ZugaShield] = None
+# ===================================================================
+# Module-level singleton + helpers
+# ===================================================================
 
 
 def get_zugashield() -> ZugaShield:
-    """Get or create the singleton ZugaShield instance."""
-    global _shield
-    if _shield is None:
-        _shield = ZugaShield()
-    return _shield
+    """Get or create the module-level ZugaShield singleton."""
+    global _singleton
+    if _singleton is None:
+        _singleton = ZugaShield()
+    return _singleton
+
+
+def set_zugashield(instance: ZugaShield) -> None:
+    """Replace the module-level singleton (use for custom initialization)."""
+    global _singleton
+    _singleton = instance
 
 
 def reset_zugashield() -> None:
-    """Reset the singleton (for testing)."""
-    global _shield
-    _shield = None
+    """Reset the singleton to None (useful for tests)."""
+    global _singleton
+    _singleton = None
 
+
+def set_approval_provider(provider: Callable) -> None:
+    """Set the human-in-the-loop approval provider for CHALLENGE verdicts."""
+    global _approval_provider
+    _approval_provider = provider
+
+
+# ===================================================================
+# Re-exports for convenience
+# ===================================================================
 
 __all__ = [
-    # Version
-    "__version__",
     # Facade
     "ZugaShield",
+    "ZugaShieldBuilder",
     "get_zugashield",
+    "set_zugashield",
     "reset_zugashield",
     "set_approval_provider",
-    "get_approval_provider",
-    # Types
-    "AnomalyScore",
-    "MemoryTrust",
-    "ShieldDecision",
-    "ShieldVerdict",
-    "ThreatCategory",
-    "ThreatDetection",
-    "ThreatLevel",
-    "ToolPolicy",
-    "allow_decision",
-    "block_decision",
     # Config
     "ShieldConfig",
     # Catalog
     "ThreatCatalog",
-    # Audit
-    "ShieldAuditLogger",
+    # Types
+    "ShieldDecision",
+    "ShieldVerdict",
+    "ThreatLevel",
+    "ThreatCategory",
+    "ThreatDetection",
+    "AnomalyScore",
+    # Version
+    "__version__",
 ]

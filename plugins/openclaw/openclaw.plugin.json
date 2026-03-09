@@ -1,8 +1,8 @@
 {
   "id": "openclaw-plugin",
   "name": "ZugaShield Security Scanner",
-  "description": "7-layer AI security scanning for all OpenClaw channels. Blocks prompt injection, SSRF, command injection, data leakage, and memory poisoning.",
-  "version": "0.1.0",
+  "description": "7-layer AI security + ML detection for all OpenClaw channels. Covers all 10 OWASP Agentic AI risks: prompt injection, tool misuse, memory poisoning, data exfiltration, and more.",
+  "version": "1.1.0",
   "services": ["zugashield-mcp"],
   "configSchema": {
     "type": "object",

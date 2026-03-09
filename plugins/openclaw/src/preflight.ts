@@ -65,10 +65,25 @@ export async function runPreflight(pythonExe: string): Promise<PreflightResult> 
   return result;
 }
 
+/** Minimal environment for preflight child processes. */
+function safeEnv(): Record<string, string> {
+  const allowlist = [
+    "PATH", "SYSTEMROOT", "TEMP", "TMP", "HOME", "USERPROFILE",
+    "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA",
+    "PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV", "CONDA_PREFIX",
+  ];
+  const env: Record<string, string> = {};
+  for (const key of allowlist) {
+    const val = process.env[key];
+    if (val !== undefined) env[key] = val;
+  }
+  return env;
+}
+
 /** Promise wrapper around child_process.execFile with a 10s timeout. */
 function exec(cmd: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(cmd, args, { timeout: 10_000 }, (error, stdout, stderr) => {
+    execFile(cmd, args, { timeout: 10_000, env: safeEnv() }, (error, stdout, stderr) => {
       if (error) reject(new Error(stderr || error.message));
       else resolve(stdout);
     });

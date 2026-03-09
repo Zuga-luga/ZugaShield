@@ -5,6 +5,49 @@ All notable changes to ZugaShield will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-02-17
+
+### Added
+
+**ML Detection Layer (TF-IDF v2.0)**
+- TF-IDF + Logistic Regression classifier trained on 9 public datasets (~20,000+ samples)
+- 6 heuristic features: override keyword density, few-shot pattern count, special token density, repeated token indicator, imperative sentence density, second-person pronoun ratio
+- Datasets: deepset/prompt-injections, Lakera/gandalf, rubend18/ChatGPT-Jailbreak, JailbreakBench/JBB-Behaviors, jackhhao/jailbreak-classification, reshabhs/SPML, Lakera/mosscap (DEF CON 31), xTRam1/safe-guard, qualifire/prompt-injections-benchmark
+- Optional ONNX DeBERTa tier for higher accuracy (`pip install zugashield[ml]`)
+- CLI: `zugashield-ml download`, `zugashield-ml info`, `zugashield-ml download --model prompt-guard-22m`
+
+**ML Supply Chain Hardening**
+- SHA-256 hash verification of model files at load time (integrity.json + sidecar files)
+- Canary validation: 3 hardcoded behavioral smoke tests run after every model load
+- Model version pinning via `ZUGASHIELD_ML_MODEL_VERSION` config
+- Dual format support: v1.0 Pipeline (legacy) and v2.0 dict bundle with metadata
+
+**New Optional Layers**
+- CoT Auditor: chain-of-thought trace auditing for deceptive reasoning patterns
+- MCP Guard: MCP protocol security — tool definition integrity, schema validation
+- Code Scanner: LLM-generated code safety scanning (regex fast path + optional Semgrep)
+
+**Framework Integrations**
+- Starlette: base ASGI middleware with path exclusion and fail-closed mode
+- CrewAI: tool wrapper with shield check
+- LlamaIndex: callback handler
+
+**Testing**
+- Performance benchmarks: latency SLAs (<15ms per check), throughput (100 prompts), catalog load time
+- Framework adapter integration tests (FastAPI, Flask, Starlette, LangChain, MCP, Approval)
+- ML detector tests: hash verification, canary validation, version pinning, heuristic features
+
+### Changed
+
+- TF-IDF model retrained with optimized hyperparameters (C=50, ngram_range=(2,6), max_features=100K)
+- Detection improvement: deepset recall 25% -> 88.7%, gandalf 99% -> 100%, 0% false positives
+- 3-round systematic benchmark across 30+ configurations to find optimal training parameters
+
+### Fixed
+
+- `SecurityError` in `threat_catalog.py` was raised but never defined — added exception class
+- Integrity verification now skips metadata sections (prefixed with `_`) in integrity.json
+
 ## [0.1.0] - 2026-02-17
 
 First public release — extracted from Zugabot's internal security system into a standalone, zero-dependency package.
@@ -115,4 +158,5 @@ First public release — extracted from Zugabot's internal security system into 
 - **Lifetime anomaly score**: Non-decaying floor prevents patience attacks
 - **Expanded homoglyphs**: ~200 confusable pairs (up from 27)
 
+[1.1.0]: https://github.com/Zuga-luga/ZugaShield/releases/tag/v1.1.0
 [0.1.0]: https://github.com/Zuga-luga/ZugaShield/releases/tag/v0.1.0

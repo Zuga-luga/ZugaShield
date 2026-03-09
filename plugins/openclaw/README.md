@@ -13,7 +13,9 @@ Intercepts every message, tool call, and response through OpenClaw's Gateway hoo
 | `preResponse` | `scan_output` | Secret leakage, PII exposure, data exfiltration |
 | `preRecall` | `scan_memory` | Memory poisoning, embedded instructions |
 
-**7 defense layers, 150+ threat signatures, <15ms per scan.**
+**7 defense layers, 150+ threat signatures, ML classifier (88.7% recall, 0% FP), <15ms per scan.**
+
+Covers all 10 [OWASP Agentic AI](https://genai.owasp.org/) risks (ASI01-ASI10).
 
 ## Architecture
 
@@ -122,6 +124,16 @@ All fields are optional — defaults are secure.
 
 - `/shield status` — Connection state, Python version, enabled layers
 - `/shield report` — Scan count, block count, recent threat events
+
+## ML-Powered Detection
+
+When ZugaShield is installed with ML support (`pip install "zugashield[ml-light]"`), the plugin automatically enables:
+
+- **TF-IDF classifier** trained on 9 public datasets (~20K+ samples including DEF CON 31 red-team data)
+- **6 heuristic features** that catch semantic attacks (role-play, instruction override, few-shot poisoning)
+- **Supply chain hardening**: SHA-256 model verification, canary validation, version pinning
+
+No configuration needed — the ML layer activates automatically when the dependencies are present.
 
 ## Development
 

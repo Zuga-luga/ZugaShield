@@ -40,3 +40,9 @@ try:
     __all__.append("MCPGuardLayer")
 except ImportError:
     pass
+
+try:
+    from zugashield.layers.ml_detector import MLDetectorLayer
+    __all__.append("MLDetectorLayer")
+except ImportError:
+    pass

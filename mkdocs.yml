@@ -1,0 +1,111 @@
+site_name: ZugaShield
+site_url: https://zugashield.dev
+site_description: 7-layer security system for AI agents — prompt injection, tool exploitation, memory poisoning, and more.
+site_author: Antonio Zugaldia
+repo_url: https://github.com/Zuga-luga/ZugaShield
+repo_name: Zuga-luga/ZugaShield
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+            show_root_heading: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Zuga-luga/ZugaShield
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/zugashield/
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+    - Configuration: getting-started/configuration.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - 7-Layer Defense: architecture/layers.md
+    - OWASP ASI Mapping: architecture/owasp-asi.md
+    - ML Detection: architecture/ml-detection.md
+  - Layers:
+    - Perimeter: layers/perimeter.md
+    - Prompt Armor: layers/prompt-armor.md
+    - Tool Guard: layers/tool-guard.md
+    - Memory Sentinel: layers/memory-sentinel.md
+    - Exfiltration Guard: layers/exfiltration-guard.md
+    - Anomaly Detector: layers/anomaly-detector.md
+    - Wallet Fortress: layers/wallet-fortress.md
+  - Integrations:
+    - FastAPI: integrations/fastapi.md
+    - Flask: integrations/flask.md
+    - Starlette: integrations/starlette.md
+    - LangChain: integrations/langchain.md
+    - MCP Server: integrations/mcp.md
+    - OpenClaw: integrations/openclaw.md
+    - Human-in-the-Loop: integrations/approval.md
+  - ML & Detection:
+    - TF-IDF Classifier: ml/tfidf.md
+    - ONNX DeBERTa: ml/onnx.md
+    - Supply Chain Hardening: ml/supply-chain.md
+    - Training Your Own: ml/training.md
+  - Security:
+    - Threat Catalog: security/threat-catalog.md
+    - Threat Feed: security/threat-feed.md
+    - Red Team Guide: security/red-team.md
+  - API Reference: api/reference.md
+  - Changelog: changelog.md
