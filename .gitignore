@@ -12,3 +12,13 @@ build/
 venv/
 .env
 *.log
+
+# Node
+node_modules/
+
+# HuggingFace dataset cache (regeneratable by the datasets library)
+.zugashield-test-data/
+
+# Promptfoo eval output (regenerated each run; keep dir via .gitkeep)
+promptfoo/reports/*
+!promptfoo/reports/.gitkeep
